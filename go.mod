@@ -1,3 +1,5 @@
-module github.com/YOUR-USER-OR-ORG-NAME/YOUR-REPO-NAME
+module gitlab.epfl.ch/valaczka/carrier
 
-go 1.14
+go 1.18
+
+require github.com/rs/xid v1.4.0 // indirect
