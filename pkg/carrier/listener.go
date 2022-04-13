@@ -5,6 +5,7 @@ import (
 	. "gitlab.epfl.ch/valaczka/carrier/pkg/util"
 	"net"
 	"os"
+	"strconv"
 )
 
 type Listener interface {
@@ -21,6 +22,7 @@ type TCPListener struct {
 
 	// utils
 	name string
+	port int
 }
 
 func (tcpl *TCPListener) Start() {
@@ -28,7 +30,7 @@ func (tcpl *TCPListener) Start() {
 }
 
 func (tcpl *TCPListener) Stop() {
-	log.Trace().Msgf("Stopping Listener " + tcpl.GetName())
+	log.Info().Msgf("Stopping Listener " + tcpl.GetName())
 	tcpl.quit <- true
 }
 
@@ -38,19 +40,19 @@ func (tcpl *TCPListener) Listen() {
 		case <-tcpl.quit:
 			return
 		default:
-			l, err := net.Listen(CONN_TYPE, CONN_HOST+":"+CONN_PORT)
+			l, err := net.Listen(TYPE, HOST+":"+strconv.Itoa(tcpl.port))
 			if err != nil {
-				log.Trace().Msgf("Error listening: %s", err.Error())
+				log.Info().Msgf(err.Error())
 				os.Exit(1)
 			}
 			// Close the listener when the application closes.
 			defer l.Close()
-			log.Trace().Msgf("Listening on " + CONN_HOST + ":" + CONN_PORT)
+			log.Info().Msgf("Listening on " + HOST + ":" + strconv.Itoa(tcpl.port))
 			for {
 				// Listen for an incoming connection.
 				conn, err := l.Accept()
 				if err != nil {
-					log.Trace().Msgf("Error accepting: ", err.Error())
+					log.Info().Msgf(err.Error())
 					os.Exit(1)
 				}
 				// Handle connections in a new goroutine.

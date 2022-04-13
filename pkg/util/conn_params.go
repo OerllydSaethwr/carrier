@@ -1,7 +1,7 @@
 package util
 
 const (
-	CONN_HOST = "localhost"
-	CONN_PORT = "8000"
-	CONN_TYPE = "tcp"
+	HOST      = "localhost"
+	BASE_PORT = 9000
+	TYPE      = "tcp"
 )

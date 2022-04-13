@@ -3,13 +3,13 @@ package carrier
 import (
 	"github.com/rs/xid"
 	"github.com/rs/zerolog/log"
+	"gitlab.epfl.ch/valaczka/carrier/pkg/util"
 )
 
 type addr string
 
 type Carrier struct {
-	clientListener Listener
-	nodeListener   Listener
+	listener Listener
 
 	quit          chan bool
 	targetMempool addr
@@ -17,12 +17,17 @@ type Carrier struct {
 	secret string
 }
 
-//  TODO: just forward everything to an address
-func NewProxy() *Carrier {
+func NewCarrier() *Carrier {
 	p := Carrier{
 		quit:          make(chan bool, 1),
-		secret:        xid.New().String(), //TODO
+		secret:        xid.New().String(), //TODO pass in
 		targetMempool: "0.0.0.0",
+
+		listener: &TCPListener{
+			quit: make(chan bool, 1),
+			name: "l",
+			port: util.BASE_PORT + 200, //TODO random number, change when size of testbed is known
+		},
 	}
 
 	return &p
@@ -32,13 +37,11 @@ func NewProxy() *Carrier {
 	Forward client requests
 */
 func (c *Carrier) Start() {
-	c.clientListener.Start()
-	c.nodeListener.Start()
+	c.listener.Start()
 }
 
 func (c *Carrier) Stop() {
 	log.Trace().Msgf("Stopping Carrier")
 
-	c.clientListener.Stop()
-	c.nodeListener.Stop()
+	c.listener.Stop()
 }
