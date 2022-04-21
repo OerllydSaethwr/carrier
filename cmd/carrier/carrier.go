@@ -2,14 +2,18 @@ package main
 
 import (
 	"gitlab.epfl.ch/valaczka/carrier/pkg/carrier"
-	"time"
+	"os"
+	"strconv"
+	"sync"
 )
 
 func main() {
-	c := carrier.NewCarrier()
+	wg := &sync.WaitGroup{}
+	front := os.Args[1]
+	port, _ := strconv.Atoi(os.Args[2])
+
+	c := carrier.NewCarrier(wg, front, port)
 	c.Start()
 
-	for {
-		time.Sleep(time.Second * 100000)
-	}
+	wg.Wait()
 }
