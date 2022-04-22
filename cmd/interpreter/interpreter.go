@@ -2,9 +2,9 @@ package main
 
 import (
 	"bufio"
+	"github.com/OerllydSaethwr/carrier/pkg/carrier"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"gitlab.epfl.ch/valaczka/carrier/pkg/carrier"
 	"os"
 	"sync"
 )
@@ -43,7 +43,7 @@ MAINLOOP:
 			zerolog.SetGlobalLevel(level)
 			log.Error().Msgf("Log level set to " + level.String())
 		case "start":
-			c := carrier.NewCarrier(wg)
+			c := carrier.NewCarrier(wg, "", 0)
 			c.Start()
 			nodes = append(nodes, c)
 			log.Error().Msgf("Carrier started")

@@ -1,8 +1,8 @@
 package carrier
 
 import (
+	. "github.com/OerllydSaethwr/carrier/pkg/util"
 	"github.com/rs/zerolog/log"
-	. "gitlab.epfl.ch/valaczka/carrier/pkg/util"
 	"net"
 	"os"
 	"strconv"

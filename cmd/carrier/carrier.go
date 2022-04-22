@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/OerllydSaethwr/carrier"
+	"github.com/OerllydSaethwr/carrier/pkg/carrier"
 	"os"
 	"strconv"
 	"sync"
