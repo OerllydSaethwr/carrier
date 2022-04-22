@@ -1,7 +1,7 @@
 package main
 
 import (
-	"gitlab.epfl.ch/valaczka/carrier/pkg/carrier"
+	"github.com/OerllydSaethwr/carrier"
 	"os"
 	"strconv"
 	"sync"
