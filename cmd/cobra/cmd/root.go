@@ -24,32 +24,8 @@ var rootCmd = &cobra.Command{
 			Cobra is a CLI library for Go that empowers applications.
 			This application is a tool to generate the needed files
 			to quickly create a Cobra application.`,
-	Args: func(cmd *cobra.Command, args []string) error {
-		if len(args) < 2 {
-			return errors.New("requires <target> <listener>")
-		}
-		host, _, err := net.SplitHostPort(args[0])
-		hostp := net.ParseIP(host)
-		if err != nil || hostp == nil {
-			return fmt.Errorf("<front> %s", err)
-		}
-		host, _, err = net.SplitHostPort(args[1])
-		hostp = net.ParseIP(host)
-		if err != nil || hostp == nil {
-			return fmt.Errorf("<mempool> %s", err)
-		}
-		return nil
-	},
-	Run: func(cmd *cobra.Command, args []string) {
-		wg := &sync.WaitGroup{}
-		front := args[0]
-		mempool := args[1]
-
-		c := carrier.NewCarrier(wg, front, mempool)
-		c.Start()
-
-		wg.Wait()
-	},
+	Args: validate,
+	Run:  run,
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -71,4 +47,37 @@ func init() {
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
 	//rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+}
+
+func validate(cmd *cobra.Command, args []string) error {
+	if len(args) < 3 {
+		return errors.New("requires <client2carrier> <carrier2carrier> <front>")
+	}
+	host, _, err := net.SplitHostPort(args[0])
+	hostp := net.ParseIP(host)
+	if err != nil || hostp == nil {
+		return fmt.Errorf("<client2carrier> %s", err)
+	}
+	hostp = net.ParseIP(host)
+	if err != nil || hostp == nil {
+		return fmt.Errorf("<carrier2carrier> %s", err)
+	}
+	host, _, err = net.SplitHostPort(args[1])
+	hostp = net.ParseIP(host)
+	if err != nil || hostp == nil {
+		return fmt.Errorf("<front> %s", err)
+	}
+	return nil
+}
+
+func run(cmd *cobra.Command, args []string) {
+	wg := &sync.WaitGroup{}
+	clientToCarrierAddr := args[0]
+	carrierToCarrierAddr := args[1]
+	frontAddr := args[2]
+
+	c := carrier.NewCarrier(wg, clientToCarrierAddr, carrierToCarrierAddr, frontAddr)
+	c.Start()
+
+	wg.Wait()
 }

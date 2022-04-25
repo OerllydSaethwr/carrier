@@ -5,42 +5,56 @@ import (
 	"github.com/OerllydSaethwr/carrier/pkg/util"
 	"github.com/rs/xid"
 	"github.com/rs/zerolog/log"
+	"net"
 	"sync"
 )
 
 type Carrier struct {
-	listener Listener
+	clientListener  Listener
+	carrierListener Listener
+	processClient   chan net.Conn
+	processCarrier  chan net.Conn
 
-	quit  chan bool
-	front string
-	wg    *sync.WaitGroup
+	carrierAddr string
+	carrierPort int
+	frontAddr   string
+	frontPort   int
+
+	wg *sync.WaitGroup
 
 	secret string
+	quit   chan bool
 }
 
-func NewCarrier(wg *sync.WaitGroup, front, mempool string) *Carrier {
-	hostf, portf, err := util.SplitHostPort(front)
+func NewCarrier(wg *sync.WaitGroup, clientToCarrierAddr, carrierToCarrierAddr, frontAddr string) *Carrier {
+	hostcl2ca, portcl2ca, err := util.SplitHostPort(clientToCarrierAddr)
 	if err != nil {
 		log.Error().Msgf(err.Error())
 	}
-	hostm, portm, err := util.SplitHostPort(mempool)
+	hostca2ca, portca2ca, err := util.SplitHostPort(carrierToCarrierAddr)
+	if err != nil {
+		log.Error().Msgf(err.Error())
+	}
+	hostca2f, portca2f, err := util.SplitHostPort(frontAddr)
 	if err != nil {
 		log.Error().Msgf(err.Error())
 	}
 
-	fmt.Println(hostf, portf, hostm) //TODO remove
+	fmt.Println(hostca2f, portca2f) //TODO remove
+
+	processClient := make(chan net.Conn)
+	processCarrier := make(chan net.Conn)
 
 	p := Carrier{
-		quit:   make(chan bool, 1),
-		secret: xid.New().String(), //TODO pass in
-		front:  front,
+		clientListener:  NewTCPListener(processClient, hostcl2ca, portcl2ca),
+		carrierListener: NewTCPListener(processCarrier, hostca2ca, portca2ca),
+		processClient:   processClient,
+		processCarrier:  processCarrier,
 
-		listener: &TCPListener{
-			quit: make(chan bool, 1),
-			name: "l",
-			port: portm,
-		},
 		wg: wg,
+
+		secret: xid.New().String(), //TODO pass in
+		quit:   make(chan bool, 1),
 	}
 
 	return &p
@@ -48,15 +62,47 @@ func NewCarrier(wg *sync.WaitGroup, front, mempool string) *Carrier {
 
 /*	Start listening to client requests
 	Forward client requests
+	We are not waiting for listeners to stop but I think it's fine
 */
 func (c *Carrier) Start() {
 	c.wg.Add(1)
-	c.listener.Start()
+	go c.clientListener.Listen()
+	go c.startProcessor(c.clientListener, c.processClientConn)
 }
 
 func (c *Carrier) Stop() {
 	log.Trace().Msgf("Stopping Carrier")
 
-	c.listener.Stop()
+	c.clientListener.Stop()
+	c.quit <- true
 	c.wg.Done()
+}
+
+func (c *Carrier) startProcessor(listener Listener, process func(conn net.Conn)) {
+	for {
+		select {
+		case <-c.quit:
+			return
+		default:
+			process(listener.GetConn())
+		}
+	}
+}
+
+func (c *Carrier) processClientConn(conn net.Conn) {
+
+	// Make a buffer to hold incoming data.
+	buf := make([]byte, 1024)
+	// Read the incoming connection into the buffer.
+	_, err := conn.Read(buf)
+	if err != nil {
+		log.Trace().Msgf("Error reading:", err.Error())
+	}
+	// Close the connection when you're done with it.
+	conn.Close()
+
+}
+
+func (c *Carrier) processCarrierConn(conn net.Conn) {
+	return
 }
