@@ -88,7 +88,7 @@ func (c *Carrier) startProcessor(l *net.TCPListener, process func(conn net.Conn)
 
 func (c *Carrier) processClientConn(conn net.Conn) {
 	// Make a buffer to hold incoming data.
-	buf := make([]byte, 5)
+	buf := make([]byte, 9)
 	// Read the incoming connection into the buffer.
 	reader := io.LimitReader(conn, int64(len(buf)))
 	_, err := reader.Read(buf)
