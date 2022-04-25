@@ -2,6 +2,7 @@ package carrier
 
 import (
 	"github.com/rs/zerolog/log"
+	"io"
 	"net"
 	"sync"
 )
@@ -9,8 +10,6 @@ import (
 type Carrier struct {
 	clientListener  *net.TCPListener
 	carrierListener *net.TCPListener
-	processClient   chan net.Conn
-	processCarrier  chan net.Conn
 
 	client2carrierAddr  *net.TCPAddr
 	carrier2carrierAddr *net.TCPAddr
@@ -82,20 +81,24 @@ func (c *Carrier) startProcessor(l *net.TCPListener, process func(conn net.Conn)
 				log.Error().Msgf(err.Error())
 				return
 			}
-			process(conn)
+			go process(conn)
 		}
 	}
 }
 
 func (c *Carrier) processClientConn(conn net.Conn) {
-
 	// Make a buffer to hold incoming data.
-	buf := make([]byte, 1024)
+	buf := make([]byte, 5)
 	// Read the incoming connection into the buffer.
-	_, err := conn.Read(buf)
+	reader := io.LimitReader(conn, int64(len(buf)))
+	_, err := reader.Read(buf)
 	if err != nil {
-		log.Trace().Msgf("Error reading:", err.Error())
+		log.Trace().Msgf(err.Error())
+		return
 	}
+	//if err != nil {
+	//	log.Trace().Msgf("Error reading: %s", err.Error())
+	//}
 	// Close the connection when you're done with it.
 	conn.Close()
 	log.Info().Msgf("Reading from connection %s", conn)
