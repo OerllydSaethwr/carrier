@@ -1,24 +1,20 @@
 package carrier
 
 import (
-	"fmt"
-	"github.com/OerllydSaethwr/carrier/pkg/util"
-	"github.com/rs/xid"
 	"github.com/rs/zerolog/log"
 	"net"
 	"sync"
 )
 
 type Carrier struct {
-	clientListener  Listener
-	carrierListener Listener
+	clientListener  *net.TCPListener
+	carrierListener *net.TCPListener
 	processClient   chan net.Conn
 	processCarrier  chan net.Conn
 
-	carrierAddr string
-	carrierPort int
-	frontAddr   string
-	frontPort   int
+	client2carrierAddr  *net.TCPAddr
+	carrier2carrierAddr *net.TCPAddr
+	frontAddr           *net.TCPAddr
 
 	wg *sync.WaitGroup
 
@@ -27,37 +23,29 @@ type Carrier struct {
 }
 
 func NewCarrier(wg *sync.WaitGroup, clientToCarrierAddr, carrierToCarrierAddr, frontAddr string) *Carrier {
-	hostcl2ca, portcl2ca, err := util.SplitHostPort(clientToCarrierAddr)
+	c := &Carrier{}
+	c.wg = wg
+	c.quit = make(chan bool, 1)
+	//TODO secret
+
+	var err error
+	c.client2carrierAddr, err = net.ResolveTCPAddr("tcp4", clientToCarrierAddr)
 	if err != nil {
 		log.Error().Msgf(err.Error())
+		return nil
 	}
-	hostca2ca, portca2ca, err := util.SplitHostPort(carrierToCarrierAddr)
+	c.carrier2carrierAddr, err = net.ResolveTCPAddr("tcp4", carrierToCarrierAddr)
 	if err != nil {
 		log.Error().Msgf(err.Error())
+		return nil
 	}
-	hostca2f, portca2f, err := util.SplitHostPort(frontAddr)
+	c.frontAddr, err = net.ResolveTCPAddr("tcp4", carrierToCarrierAddr)
 	if err != nil {
 		log.Error().Msgf(err.Error())
+		return nil
 	}
 
-	fmt.Println(hostca2f, portca2f) //TODO remove
-
-	processClient := make(chan net.Conn)
-	processCarrier := make(chan net.Conn)
-
-	p := Carrier{
-		clientListener:  NewTCPListener(processClient, hostcl2ca, portcl2ca),
-		carrierListener: NewTCPListener(processCarrier, hostca2ca, portca2ca),
-		processClient:   processClient,
-		processCarrier:  processCarrier,
-
-		wg: wg,
-
-		secret: xid.New().String(), //TODO pass in
-		quit:   make(chan bool, 1),
-	}
-
-	return &p
+	return c
 }
 
 /*	Start listening to client requests
@@ -66,25 +54,35 @@ func NewCarrier(wg *sync.WaitGroup, clientToCarrierAddr, carrierToCarrierAddr, f
 */
 func (c *Carrier) Start() {
 	c.wg.Add(1)
-	go c.clientListener.Listen()
+	var err error
+	c.clientListener, err = net.ListenTCP("tcp", c.client2carrierAddr)
+	if err != nil {
+		log.Error().Msgf(err.Error())
+		return
+	}
+	log.Info().Msgf("Listening on %s", c.client2carrierAddr.String())
 	go c.startProcessor(c.clientListener, c.processClientConn)
 }
 
 func (c *Carrier) Stop() {
 	log.Trace().Msgf("Stopping Carrier")
-
-	c.clientListener.Stop()
+	c.clientListener.Close()
 	c.quit <- true
 	c.wg.Done()
 }
 
-func (c *Carrier) startProcessor(listener Listener, process func(conn net.Conn)) {
+func (c *Carrier) startProcessor(l *net.TCPListener, process func(conn net.Conn)) {
 	for {
 		select {
 		case <-c.quit:
 			return
 		default:
-			process(listener.GetConn())
+			conn, err := l.AcceptTCP()
+			if err != nil {
+				log.Error().Msgf(err.Error())
+				return
+			}
+			process(conn)
 		}
 	}
 }
@@ -100,7 +98,7 @@ func (c *Carrier) processClientConn(conn net.Conn) {
 	}
 	// Close the connection when you're done with it.
 	conn.Close()
-
+	log.Info().Msgf("Reading from connection %s", conn)
 }
 
 func (c *Carrier) processCarrierConn(conn net.Conn) {
