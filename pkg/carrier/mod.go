@@ -105,7 +105,8 @@ func (c *Carrier) processClientConn(conn net.Conn) {
 	// Read the incoming connection into the buffer.
 	reader := io.LimitReader(conn, int64(len(buf)))
 
-	for _, err := reader.Read(buf); err == nil; _, err = reader.Read(buf) {
+	var err error
+	for _, err = reader.Read(buf); err == nil; _, err = reader.Read(buf) {
 		var err2 error
 		if c.nodeConn != nil {
 			_, err2 = c.nodeConn.Write(buf)
@@ -115,6 +116,7 @@ func (c *Carrier) processClientConn(conn net.Conn) {
 		}
 	}
 	conn.Close()
+	log.Info().Msgf(err.Error())
 	log.Info().Msgf("Close client connection %s", conn.RemoteAddr())
 }
 
