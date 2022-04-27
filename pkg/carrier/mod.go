@@ -1,6 +1,7 @@
 package carrier
 
 import (
+	"github.com/OerllydSaethwr/carrier/pkg/util"
 	"github.com/rs/zerolog/log"
 	"io"
 	"net"
@@ -15,6 +16,8 @@ type Carrier struct {
 	carrier2carrierAddr *net.TCPAddr
 	frontAddr           *net.TCPAddr
 
+	nodeConn *net.TCPConn
+
 	wg *sync.WaitGroup
 
 	secret string
@@ -28,20 +31,26 @@ func NewCarrier(wg *sync.WaitGroup, clientToCarrierAddr, carrierToCarrierAddr, f
 	//TODO secret
 
 	var err error
-	c.client2carrierAddr, err = net.ResolveTCPAddr("tcp4", clientToCarrierAddr)
+	c.client2carrierAddr, err = net.ResolveTCPAddr(util.Network, clientToCarrierAddr)
 	if err != nil {
 		log.Error().Msgf(err.Error())
 		return nil
 	}
-	c.carrier2carrierAddr, err = net.ResolveTCPAddr("tcp4", carrierToCarrierAddr)
+	c.carrier2carrierAddr, err = net.ResolveTCPAddr(util.Network, carrierToCarrierAddr)
 	if err != nil {
 		log.Error().Msgf(err.Error())
 		return nil
 	}
-	c.frontAddr, err = net.ResolveTCPAddr("tcp4", carrierToCarrierAddr)
+	c.frontAddr, err = net.ResolveTCPAddr(util.Network, frontAddr)
 	if err != nil {
 		log.Error().Msgf(err.Error())
 		return nil
+	}
+
+	c.nodeConn, err = net.DialTCP(util.Network, nil, c.frontAddr)
+	if err != nil {
+		log.Error().Msgf(err.Error())
+		log.Error().Msgf("Failed to connect to node")
 	}
 
 	return c
@@ -59,12 +68,12 @@ func (c *Carrier) Start() {
 		log.Error().Msgf(err.Error())
 		return
 	}
-	log.Info().Msgf("Listening on %s", c.client2carrierAddr.String())
+	log.Info().Msgf("Start listening on %s", c.client2carrierAddr.String())
 	go c.startProcessor(c.clientListener, c.processClientConn)
 }
 
 func (c *Carrier) Stop() {
-	log.Trace().Msgf("Stopping Carrier")
+	log.Trace().Msgf("Stop Carrier")
 	c.clientListener.Close()
 	c.quit <- true
 	c.wg.Done()
@@ -87,23 +96,36 @@ func (c *Carrier) startProcessor(l *net.TCPListener, process func(conn net.Conn)
 }
 
 func (c *Carrier) processClientConn(conn net.Conn) {
+	// If we didn't manage to connect to the node before, try one last time
+	if c.nodeConn == nil {
+		c.retryNodeConnection()
+	}
 	// Make a buffer to hold incoming data.
-	buf := make([]byte, 9)
+	buf := make([]byte, 9) //TODO make this configurable
 	// Read the incoming connection into the buffer.
 	reader := io.LimitReader(conn, int64(len(buf)))
-	_, err := reader.Read(buf)
-	if err != nil {
-		log.Trace().Msgf(err.Error())
-		return
+
+	for _, err := reader.Read(buf); err == nil; _, err = reader.Read(buf) {
+		var err2 error
+		if c.nodeConn != nil {
+			_, err2 = c.nodeConn.Write(buf)
+		}
+		if err2 != nil {
+			log.Error().Msgf(err2.Error())
+		}
 	}
-	//if err != nil {
-	//	log.Trace().Msgf("Error reading: %s", err.Error())
-	//}
-	// Close the connection when you're done with it.
 	conn.Close()
-	log.Info().Msgf("Reading from connection %s", conn)
+	log.Info().Msgf("Close client connection %s", conn.RemoteAddr())
 }
 
 func (c *Carrier) processCarrierConn(conn net.Conn) {
 	return
+}
+
+func (c *Carrier) retryNodeConnection() {
+	var err error
+	c.nodeConn, err = net.DialTCP(util.Network, nil, c.frontAddr)
+	if err != nil {
+		log.Error().Msgf(err.Error())
+	}
 }
