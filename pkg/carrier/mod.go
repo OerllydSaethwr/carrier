@@ -128,4 +128,5 @@ func (c *Carrier) retryNodeConnection() {
 	if err != nil {
 		log.Error().Msgf(err.Error())
 	}
+	log.Info().Msgf("Connect to node %s", c.frontAddr)
 }
