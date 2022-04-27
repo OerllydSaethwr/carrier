@@ -101,15 +101,17 @@ func (c *Carrier) processClientConn(conn net.Conn) {
 		c.retryNodeConnection()
 	}
 	// Make a buffer to hold incoming data.
-	buf := make([]byte, 9) //TODO make this configurable
+	buf := make([]byte, util.Tsx_size) //TODO make this configurable
 	// Read the incoming connection into the buffer.
-	reader := io.LimitReader(conn, int64(len(buf)))
 
 	var err error
-	for _, err = reader.Read(buf); err == nil; _, err = reader.Read(buf) {
+	var n int
+	for n, err = io.ReadAtLeast(conn, buf, util.Tsx_size); err == nil; n, err = io.ReadAtLeast(conn, buf, util.Tsx_size) {
 		var err2 error
+		log.Info().Msgf("Read %d bytes from %s", n, conn.RemoteAddr())
 		if c.nodeConn != nil {
 			_, err2 = c.nodeConn.Write(buf)
+			log.Info().Msgf("Forwarded %d bytes to %s", n, c.nodeConn.RemoteAddr())
 		}
 		if err2 != nil {
 			log.Error().Msgf(err2.Error())
