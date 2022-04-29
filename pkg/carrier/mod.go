@@ -106,7 +106,7 @@ func (c *Carrier) Start() {
 		return
 	}
 	log.Info().Msgf("Start listening to client on %s", c.client2carrierAddr.String())
-	go c.startProcessor(c.clientListener, c.processClientConn)
+	go c.handleIncomingConnections(c.clientListener, c.processClientConn)
 
 	// Start carrier listener
 	c.carrierListener, err = net.ListenTCP(util.Network, c.carrier2carrierAddr)
@@ -114,7 +114,7 @@ func (c *Carrier) Start() {
 		log.Error().Msgf(err.Error())
 	}
 	log.Info().Msgf("Start listening to carriers on %s", c.client2carrierAddr.String())
-	go c.startProcessor(c.carrierListener, c.processCarrierConn)
+	go c.handleIncomingConnections(c.carrierListener, c.processCarrierConn)
 
 	// Set up connections to other carriers
 	for _, carrierAddr := range c.carrierAddrs {
@@ -132,7 +132,7 @@ func (c *Carrier) Stop() {
 	c.wg.Done()
 }
 
-func (c *Carrier) startProcessor(l *net.TCPListener, process func(conn net.Conn)) {
+func (c *Carrier) handleIncomingConnections(l *net.TCPListener, handler func(conn net.Conn)) {
 	for {
 		select {
 		case <-c.quit:
@@ -143,7 +143,7 @@ func (c *Carrier) startProcessor(l *net.TCPListener, process func(conn net.Conn)
 				log.Error().Msgf(err.Error())
 				return
 			}
-			go process(conn)
+			go handler(conn)
 		}
 	}
 }
