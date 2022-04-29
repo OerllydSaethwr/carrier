@@ -100,7 +100,7 @@ func (c *Carrier) Start() {
 	}
 
 	// Start client listener
-	c.clientListener, err = net.ListenTCP(util.Network, c.client2carrierAddr)
+	c.clientListener, err = util.ListenTCP(c.client2carrierAddr)
 	if err != nil {
 		log.Error().Msgf(err.Error())
 		return
@@ -109,7 +109,7 @@ func (c *Carrier) Start() {
 	go c.handleIncomingConnections(c.clientListener, c.processClientConn)
 
 	// Start carrier listener
-	c.carrierListener, err = net.ListenTCP(util.Network, c.carrier2carrierAddr)
+	c.carrierListener, err = util.ListenTCP(c.carrier2carrierAddr)
 	if err != nil {
 		log.Error().Msgf(err.Error())
 	}
