@@ -173,7 +173,10 @@ func (c *Carrier) processClientConn(conn net.Conn) {
 			log.Error().Msgf(err2.Error())
 		}
 	}
-	conn.Close()
+	err2 := conn.Close()
+	if err2 != nil {
+		log.Error().Msgf(err.Error())
+	}
 	log.Info().Msgf(err.Error())
 	log.Info().Msgf("Close client connection %s", conn.RemoteAddr())
 }
