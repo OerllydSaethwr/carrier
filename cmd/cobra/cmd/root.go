@@ -14,7 +14,6 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
-	"sync"
 )
 
 const (
@@ -91,7 +90,7 @@ func validate(cmd *cobra.Command, args []string) error {
 }
 
 func run(cmd *cobra.Command, args []string) {
-	wg := &sync.WaitGroup{}
+
 	clientToCarrierAddr := args[client2carrier]
 	carrierToCarrierAddr := args[carrier2carrier]
 	frontAddr := args[front]
@@ -108,8 +107,8 @@ func run(cmd *cobra.Command, args []string) {
 		log.Error().Msgf(err.Error())
 	}
 
-	c := carrier.NewCarrier(wg, clientToCarrierAddr, carrierToCarrierAddr, frontAddr, carriers.CarrierAddrs)
-	c.Start()
+	c := carrier.NewCarrier(clientToCarrierAddr, carrierToCarrierAddr, frontAddr, carriers.CarrierAddrs)
+	wg := c.Start()
 
 	wg.Wait()
 }

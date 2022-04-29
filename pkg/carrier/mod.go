@@ -40,7 +40,7 @@ type CarrierAddrs struct {
 	CarrierAddrs []string `json:"carriers"`
 }
 
-func NewCarrier(wg *sync.WaitGroup, clientToCarrierAddr, carrierToCarrierAddr, frontAddr string, carrierAddrs []string) *Carrier {
+func NewCarrier(clientToCarrierAddr, carrierToCarrierAddr, frontAddr string, carrierAddrs []string) *Carrier {
 	conf := Config{
 		carrierConnRetryDelay: util.CarrierConnRetryDelay,
 		carrierConnMaxRetry:   util.CarrierConnMaxRetry,
@@ -49,7 +49,6 @@ func NewCarrier(wg *sync.WaitGroup, clientToCarrierAddr, carrierToCarrierAddr, f
 	c := &Carrier{}
 	c.conf = conf
 	c.carrierConns = make([]*net.TCPConn, 0)
-	c.wg = wg
 	c.quit = make(chan bool, 1)
 	//TODO secret
 
@@ -87,7 +86,8 @@ func NewCarrier(wg *sync.WaitGroup, clientToCarrierAddr, carrierToCarrierAddr, f
 	Forward client requests
 	We are not waiting for listeners to stop but I think it's fine
 */
-func (c *Carrier) Start() {
+func (c *Carrier) Start() *sync.WaitGroup {
+	c.wg = &sync.WaitGroup{}
 	c.wg.Add(1)
 
 	var err error
@@ -103,7 +103,8 @@ func (c *Carrier) Start() {
 	c.clientListener, err = util.ListenTCP(c.client2carrierAddr)
 	if err != nil {
 		log.Error().Msgf(err.Error())
-		return
+		c.wg.Done()
+		return c.wg
 	}
 	log.Info().Msgf("Start listening to client on %s", c.client2carrierAddr.String())
 	go c.handleIncomingConnections(c.clientListener, c.processClientConn)
@@ -120,6 +121,8 @@ func (c *Carrier) Start() {
 	for _, carrierAddr := range c.carrierAddrs {
 		go c.setupCarrierConnection(carrierAddr)
 	}
+
+	return c.wg
 }
 
 func (c *Carrier) Stop() {
