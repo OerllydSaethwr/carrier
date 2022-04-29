@@ -14,3 +14,8 @@ func SplitHostPort(hostport string) (string, int, error) {
 
 	return host, port, err
 }
+
+// Wrapper around net.DialTCP
+func DialTCP(raddr *net.TCPAddr) (*net.TCPConn, error) {
+	return net.DialTCP(Network, nil, raddr)
+}

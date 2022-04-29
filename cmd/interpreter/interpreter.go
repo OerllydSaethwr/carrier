@@ -43,7 +43,7 @@ MAINLOOP:
 			zerolog.SetGlobalLevel(level)
 			log.Error().Msgf("Log level set to " + level.String())
 		case "start":
-			c := carrier.NewCarrier(wg, "", "", "")
+			c := carrier.NewCarrier(wg, "", "", "", nil)
 			c.Start()
 			nodes = append(nodes, c)
 			log.Error().Msgf("Carrier started")

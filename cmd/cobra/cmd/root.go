@@ -5,13 +5,23 @@ Copyright © 2022 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/OerllydSaethwr/carrier/pkg/carrier"
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
+	"io/ioutil"
 	"net"
 	"os"
 	"sync"
+)
+
+const (
+	client2carrier  = 0
+	carrier2carrier = 1
+	front           = 2
+	carriersFile    = 3
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -50,33 +60,55 @@ func init() {
 }
 
 func validate(cmd *cobra.Command, args []string) error {
-	if len(args) < 3 {
-		return errors.New("requires <client2carrier> <carrier2carrier> <front>")
+	if len(args) < 4 {
+		return errors.New("requires <client2carrier> <carrier2carrier> <front> <carriers_file>")
 	}
-	host, _, err := net.SplitHostPort(args[0])
+
+	// Check IPs
+	host, _, err := net.SplitHostPort(args[client2carrier])
 	hostp := net.ParseIP(host)
 	if err != nil || hostp == nil {
-		return fmt.Errorf("<client2carrier> %s", err)
+		return fmt.Errorf("<client2carrier> %s", err.Error())
 	}
+	host, _, err = net.SplitHostPort(args[carrier2carrier])
 	hostp = net.ParseIP(host)
 	if err != nil || hostp == nil {
-		return fmt.Errorf("<carrier2carrier> %s", err)
+		return fmt.Errorf("<carrier2carrier> %s", err.Error())
 	}
-	host, _, err = net.SplitHostPort(args[1])
+	host, _, err = net.SplitHostPort(args[front])
 	hostp = net.ParseIP(host)
 	if err != nil || hostp == nil {
-		return fmt.Errorf("<front> %s", err)
+		return fmt.Errorf("<front> %s", err.Error())
 	}
+
+	// Check we can open carriersFile
+	_, err = os.Stat(args[carriersFile])
+	if err != nil {
+		return fmt.Errorf("<carriers_file> %s", err.Error())
+	}
+
 	return nil
 }
 
 func run(cmd *cobra.Command, args []string) {
 	wg := &sync.WaitGroup{}
-	clientToCarrierAddr := args[0]
-	carrierToCarrierAddr := args[1]
-	frontAddr := args[2]
+	clientToCarrierAddr := args[client2carrier]
+	carrierToCarrierAddr := args[carrier2carrier]
+	frontAddr := args[front]
 
-	c := carrier.NewCarrier(wg, clientToCarrierAddr, carrierToCarrierAddr, frontAddr)
+	carriersFile, err := os.Open(args[carriersFile])
+	if err != nil {
+		log.Error().Msgf(err.Error())
+	}
+
+	byteValue, err := ioutil.ReadAll(carriersFile)
+	var carriers carrier.CarrierAddrs
+	err = json.Unmarshal(byteValue, &carriers)
+	if err != nil {
+		log.Error().Msgf(err.Error())
+	}
+
+	c := carrier.NewCarrier(wg, clientToCarrierAddr, carrierToCarrierAddr, frontAddr, carriers.CarrierAddrs)
 	c.Start()
 
 	wg.Wait()
