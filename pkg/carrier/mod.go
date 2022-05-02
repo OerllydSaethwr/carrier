@@ -24,6 +24,8 @@ type Carrier struct {
 	carrierAddrs []*net.TCPAddr
 	carrierConns []*net.TCPConn
 
+	mempool [][]byte
+
 	wg *sync.WaitGroup
 
 	secret string
@@ -49,6 +51,7 @@ func NewCarrier(clientToCarrierAddr, carrierToCarrierAddr, frontAddr string, car
 	c := &Carrier{}
 	c.conf = conf
 	c.carrierConns = make([]*net.TCPConn, 0)
+	c.mempool = make([][]byte, 0)
 	c.quit = make(chan bool, 1)
 	//TODO secret
 
@@ -107,7 +110,7 @@ func (c *Carrier) Start() *sync.WaitGroup {
 		return c.wg
 	}
 	log.Info().Msgf("Start listening to client on %s", c.client2carrierAddr.String())
-	go c.handleIncomingConnections(c.clientListener, c.processClientConn)
+	go c.handleIncomingConnections(c.clientListener, c.handleClientConn)
 
 	// Start carrier listener
 	c.carrierListener, err = util.ListenTCP(c.carrier2carrierAddr)
@@ -115,7 +118,7 @@ func (c *Carrier) Start() *sync.WaitGroup {
 		log.Error().Msgf(err.Error())
 	}
 	log.Info().Msgf("Start listening to carriers on %s", c.client2carrierAddr.String())
-	go c.handleIncomingConnections(c.carrierListener, c.processCarrierConn)
+	go c.handleIncomingConnections(c.carrierListener, c.handleCarrierConn)
 
 	// Set up connections to other carriers
 	for _, carrierAddr := range c.carrierAddrs {
@@ -151,7 +154,7 @@ func (c *Carrier) handleIncomingConnections(l *net.TCPListener, handler func(con
 	}
 }
 
-func (c *Carrier) processClientConn(conn net.Conn) {
+func (c *Carrier) handleClientConn(conn net.Conn) {
 	// If we didn't manage to connect to the node before, try one last time
 	if c.nodeConn == nil {
 		c.retryNodeConnection()
@@ -181,7 +184,7 @@ func (c *Carrier) processClientConn(conn net.Conn) {
 	log.Info().Msgf("Close client connection %s", conn.RemoteAddr())
 }
 
-func (c *Carrier) processCarrierConn(conn net.Conn) {
+func (c *Carrier) handleCarrierConn(conn net.Conn) {
 	return
 }
 
@@ -208,3 +211,12 @@ func (c *Carrier) setupCarrierConnection(carrierAddr *net.TCPAddr) {
 		}
 	}
 }
+
+/* TODO
+1. add command to generate key files
+2. batch transactions in local mempool
+- add stuff
+- remove stuff when threshold is hit
+3. process that watches mempool and invokes functions after threshold
+
+*/
