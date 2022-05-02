@@ -77,13 +77,13 @@ outerLoop:
 }
 
 func (c *Carrier) handleCarrierConn(conn net.Conn) {
-	decoder := gob.NewDecoder(conn)
-	rawMessage := &Message{}
-
 	for {
+		decoder := gob.NewDecoder(conn)
+		rawMessage := &Message{}
 		err := decoder.Decode(rawMessage)
 		if err != nil {
 			log.Error().Msgf(err.Error())
+			return
 		}
 
 		var message any
@@ -91,6 +91,7 @@ func (c *Carrier) handleCarrierConn(conn net.Conn) {
 		case Init:
 			message = &InitMessage{}
 			err = json.Unmarshal(rawMessage.Payload, message)
+			//c.messageHandlers[Init](message)
 		case Echo:
 			message = &EchoMessage{}
 			err = json.Unmarshal(rawMessage.Payload, message)
@@ -114,7 +115,7 @@ func (c *Carrier) handleCarrierConn(conn net.Conn) {
 }
 
 func (c *Carrier) handleInitMessage(rawMessage any) error {
-	_, ok := rawMessage.(InitMessage)
+	_, ok := rawMessage.(*InitMessage)
 	if !ok {
 		return errors.New("expected InitMessage")
 	}
