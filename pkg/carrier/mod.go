@@ -3,7 +3,6 @@ package carrier
 import (
 	"github.com/OerllydSaethwr/carrier/pkg/util"
 	"github.com/rs/zerolog/log"
-	"io"
 	"net"
 	"sync"
 	"time"
@@ -22,9 +21,16 @@ type Carrier struct {
 	nodeConn *net.TCPConn
 
 	carrierAddrs []*net.TCPAddr
-	carrierConns []*net.TCPConn
 
-	mempool [][]byte
+	// We are relying on the pointers to addresses being equal here. This means the addresses have to originate from
+	// the same source, which for now is only in the NewCarrier function. Keep in mind if you want to compute
+	// addresses, this will break
+	carrierConns map[*net.TCPAddr]*net.TCPConn
+
+	mempool chan []byte
+
+	// Registry of message handlers. Argument must be one of the enum types
+	messageHandlers map[MessageType]func(any) error
 
 	wg *sync.WaitGroup
 
@@ -50,9 +56,15 @@ func NewCarrier(clientToCarrierAddr, carrierToCarrierAddr, frontAddr string, car
 
 	c := &Carrier{}
 	c.conf = conf
-	c.carrierConns = make([]*net.TCPConn, 0)
-	c.mempool = make([][]byte, 0)
+	c.carrierConns = map[*net.TCPAddr]*net.TCPConn{}
+	c.mempool = make(chan []byte, 100)
 	c.quit = make(chan bool, 1)
+
+	c.messageHandlers = map[MessageType]func(any) error{}
+	c.messageHandlers[Init] = c.handleInitMessage
+	c.messageHandlers[Echo] = c.handleEchoMessage
+	c.messageHandlers[Request] = c.handleRequestMessage
+	c.messageHandlers[Resolve] = c.handleResolveMessage
 	//TODO secret
 
 	var err error
@@ -138,56 +150,6 @@ func (c *Carrier) Stop() {
 	c.wg.Done()
 }
 
-func (c *Carrier) handleIncomingConnections(l *net.TCPListener, handler func(conn net.Conn)) {
-	for {
-		select {
-		case <-c.quit:
-			return
-		default:
-			conn, err := l.AcceptTCP()
-			if err != nil {
-				log.Error().Msgf(err.Error())
-				return
-			}
-			go handler(conn)
-		}
-	}
-}
-
-func (c *Carrier) handleClientConn(conn net.Conn) {
-	// If we didn't manage to connect to the node before, try one last time
-	if c.nodeConn == nil {
-		c.retryNodeConnection()
-	}
-	// Make a buffer to hold incoming data.
-	buf := make([]byte, util.Tsx_size) //TODO make this configurable
-	// Read the incoming connection into the buffer.
-
-	var err error
-	var n int
-	for n, err = io.ReadAtLeast(conn, buf, util.Tsx_size); err == nil; n, err = io.ReadAtLeast(conn, buf, util.Tsx_size) {
-		var err2 error
-		log.Info().Msgf("Read %d bytes from %s", n, conn.RemoteAddr())
-		if c.nodeConn != nil {
-			_, err2 = c.nodeConn.Write(buf)
-			log.Info().Msgf("Forwarded %d bytes to %s", n, c.nodeConn.RemoteAddr())
-		}
-		if err2 != nil {
-			log.Error().Msgf(err2.Error())
-		}
-	}
-	err2 := conn.Close()
-	if err2 != nil {
-		log.Error().Msgf(err.Error())
-	}
-	log.Info().Msgf(err.Error())
-	log.Info().Msgf("Close client connection %s", conn.RemoteAddr())
-}
-
-func (c *Carrier) handleCarrierConn(conn net.Conn) {
-	return
-}
-
 func (c *Carrier) retryNodeConnection() {
 	var err error
 	c.nodeConn, err = util.DialTCP(c.frontAddr)
@@ -195,21 +157,6 @@ func (c *Carrier) retryNodeConnection() {
 		log.Error().Msgf(err.Error())
 	}
 	log.Info().Msgf("Connect to node %s", c.frontAddr)
-}
-
-func (c *Carrier) setupCarrierConnection(carrierAddr *net.TCPAddr) {
-	// If carrierConnMaxRetry is 0, we keep retrying indefinitely
-	for i := uint(0); c.conf.carrierConnMaxRetry == 0 || i < c.conf.carrierConnMaxRetry; i++ {
-		conn, err := util.DialTCP(carrierAddr)
-		if err == nil {
-			c.carrierConns = append(c.carrierConns, conn)
-			log.Info().Msgf("Connect to carrier %s | attempt %d/%d", carrierAddr.String(), i+1, c.conf.carrierConnMaxRetry)
-			return
-		} else {
-			log.Info().Msgf("Failed to connect to carrier %s | attempt %d/%d", carrierAddr.String(), i+1, c.conf.carrierConnMaxRetry)
-			time.Sleep(c.conf.carrierConnRetryDelay)
-		}
-	}
 }
 
 /* TODO
