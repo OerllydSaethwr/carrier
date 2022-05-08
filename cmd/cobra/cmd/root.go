@@ -34,7 +34,7 @@ var rootCmd = &cobra.Command{
 			This application is a tool to generate the needed files
 			to quickly create a Cobra application.`,
 	Args: validate,
-	Run:  run,
+	Run:  runCarrier,
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -89,7 +89,7 @@ func validate(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func run(cmd *cobra.Command, args []string) {
+func runCarrier(cmd *cobra.Command, args []string) {
 
 	clientToCarrierAddr := args[client2carrier]
 	carrierToCarrierAddr := args[carrier2carrier]
