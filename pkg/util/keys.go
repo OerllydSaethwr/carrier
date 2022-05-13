@@ -3,13 +3,13 @@ package util
 import (
 	"encoding/hex"
 	"github.com/rs/zerolog/log"
-	"go.dedis.ch/kyber/v3/pairing"
-	"go.dedis.ch/kyber/v3/sign/bls"
+	"go.dedis.ch/kyber/v4/pairing"
+	"go.dedis.ch/kyber/v4/sign/bdn"
 )
 
 func NewKeyPair() (string, string) {
 	suite := pairing.NewSuiteBn256()
-	privateKey, publicKey := bls.NewKeyPair(suite, suite.RandomStream())
+	privateKey, publicKey := bdn.NewKeyPair(suite, suite.RandomStream())
 
 	skm, err := privateKey.MarshalBinary()
 	if err != nil {

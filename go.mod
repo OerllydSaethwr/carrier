@@ -6,6 +6,7 @@ require (
 	github.com/rs/zerolog v1.26.1
 	github.com/spf13/cobra v1.4.0
 	go.dedis.ch/kyber/v3 v3.0.13
+	go.dedis.ch/kyber/v4 v4.0.0-pre2
 )
 
 require (
