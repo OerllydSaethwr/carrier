@@ -1,14 +1,13 @@
 package util
 
 import (
-	"crypto"
 	"encoding/hex"
 	"github.com/rs/zerolog/log"
 	"go.dedis.ch/kyber/v3/pairing"
 	"go.dedis.ch/kyber/v3/sign/bls"
 )
 
-func NewKeyPair() (crypto.PrivateKey, crypto.PublicKey) {
+func NewKeyPair() (string, string) {
 	suite := pairing.NewSuiteBn256()
 	privateKey, publicKey := bls.NewKeyPair(suite, suite.RandomStream())
 

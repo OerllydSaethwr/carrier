@@ -6,7 +6,6 @@ package cmd
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"github.com/OerllydSaethwr/carrier/pkg/carrier"
 	"github.com/rs/zerolog/log"
@@ -26,15 +25,10 @@ const (
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "cobra",
-	Short: "A brief description of your application",
-	Long: `A longer description that spans multiple lines and likely contains
-			examples and usage of using your application. For example:
-
-			Cobra is a CLI library for Go that empowers applications.
-			This application is a tool to generate the needed files
-			to quickly create a Cobra application.`,
-	Args: validate,
-	Run:  runCarrier,
+	Short: "Run carrier node",
+	Long:  `nil`,
+	Args:  validateCarrier,
+	RunE:  runCarrier,
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -42,6 +36,7 @@ var rootCmd = &cobra.Command{
 func Execute() {
 	err := rootCmd.Execute()
 	if err != nil {
+		log.Error().Msgf(err.Error())
 		os.Exit(1)
 	}
 }
@@ -58,9 +53,9 @@ func init() {
 	//rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
 
-func validate(cmd *cobra.Command, args []string) error {
+func validateCarrier(cmd *cobra.Command, args []string) error {
 	if len(args) < 4 {
-		return errors.New("requires <client2carrier> <carrier2carrier> <front> <carriers_file>")
+		return fmt.Errorf("requires <client2carrier> <carrier2carrier> <front> <carriers_file>")
 	}
 
 	// Check IPs
@@ -89,7 +84,7 @@ func validate(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func runCarrier(cmd *cobra.Command, args []string) {
+func runCarrier(cmd *cobra.Command, args []string) error {
 
 	clientToCarrierAddr := args[client2carrier]
 	carrierToCarrierAddr := args[carrier2carrier]
@@ -97,18 +92,20 @@ func runCarrier(cmd *cobra.Command, args []string) {
 
 	carriersFile, err := os.Open(args[carriersFile])
 	if err != nil {
-		log.Error().Msgf(err.Error())
+		return err
 	}
 
 	byteValue, err := ioutil.ReadAll(carriersFile)
 	var carriers carrier.CarrierAddrs
 	err = json.Unmarshal(byteValue, &carriers)
 	if err != nil {
-		log.Error().Msgf(err.Error())
+		return err
 	}
 
 	c := carrier.NewCarrier(clientToCarrierAddr, carrierToCarrierAddr, frontAddr, carriers.CarrierAddrs)
 	wg := c.Start()
 
 	wg.Wait()
+
+	return nil
 }
