@@ -5,12 +5,11 @@ Copyright © 2022 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
-	"encoding/json"
 	"fmt"
 	"github.com/OerllydSaethwr/carrier/pkg/carrier"
+	"github.com/OerllydSaethwr/carrier/pkg/util"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
-	"io/ioutil"
 	"net"
 	"os"
 )
@@ -19,7 +18,8 @@ const (
 	client2carrier  = 0
 	carrier2carrier = 1
 	front           = 2
-	carriersFile    = 3
+	carriersf       = 3
+	keypairf        = 4
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -54,55 +54,65 @@ func init() {
 }
 
 func validateCarrier(cmd *cobra.Command, args []string) error {
-	if len(args) < 4 {
-		return fmt.Errorf("requires <client2carrier> <carrier2carrier> <front> <carriers_file>")
+	if len(args) < 5 {
+		return fmt.Errorf("requires <client2carrier> <carrier2carrier> <front> <carriers_file> <key_file>")
 	}
 
+	clientToCarrierAddr := args[client2carrier]
+	carrierToCarrierAddr := args[carrier2carrier]
+	frontAddr := args[front]
+	carriersFile := args[carriersf]
+	keyPairFile := args[keypairf]
+
 	// Check IPs
-	host, _, err := net.SplitHostPort(args[client2carrier])
+	host, _, err := net.SplitHostPort(clientToCarrierAddr)
 	hostp := net.ParseIP(host)
 	if err != nil || hostp == nil {
 		return fmt.Errorf("<client2carrier> %s", err.Error())
 	}
-	host, _, err = net.SplitHostPort(args[carrier2carrier])
+	host, _, err = net.SplitHostPort(carrierToCarrierAddr)
 	hostp = net.ParseIP(host)
 	if err != nil || hostp == nil {
 		return fmt.Errorf("<carrier2carrier> %s", err.Error())
 	}
-	host, _, err = net.SplitHostPort(args[front])
+	host, _, err = net.SplitHostPort(frontAddr)
 	hostp = net.ParseIP(host)
 	if err != nil || hostp == nil {
 		return fmt.Errorf("<front> %s", err.Error())
 	}
 
 	// Check we can open carriersFile
-	_, err = os.Stat(args[carriersFile])
+	_, err = os.Stat(carriersFile)
 	if err != nil {
 		return fmt.Errorf("<carriers_file> %s", err.Error())
+	}
+
+	_, err = os.Stat(keyPairFile)
+	if err != nil {
+		return fmt.Errorf("<key_pair_file> %s", err.Error())
 	}
 
 	return nil
 }
 
 func runCarrier(cmd *cobra.Command, args []string) error {
-
 	clientToCarrierAddr := args[client2carrier]
 	carrierToCarrierAddr := args[carrier2carrier]
 	frontAddr := args[front]
+	carriersFile := args[carriersf]
+	keyPairFile := args[keypairf]
 
-	carriersFile, err := os.Open(args[carriersFile])
+	kp, err := util.ReadKeypairFile(keyPairFile)
 	if err != nil {
 		return err
 	}
 
-	byteValue, err := ioutil.ReadAll(carriersFile)
-	var carriers carrier.CarrierAddrs
-	err = json.Unmarshal(byteValue, &carriers)
+	carriers, err := util.ReadCarriersFile(carriersFile)
 	if err != nil {
 		return err
 	}
 
-	c := carrier.NewCarrier(clientToCarrierAddr, carrierToCarrierAddr, frontAddr, carriers.CarrierAddrs)
+	c := carrier.NewCarrier(clientToCarrierAddr, carrierToCarrierAddr, frontAddr, carriers, kp)
 	wg := c.Start()
 
 	wg.Wait()

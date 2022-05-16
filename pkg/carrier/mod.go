@@ -3,6 +3,8 @@ package carrier
 import (
 	"github.com/OerllydSaethwr/carrier/pkg/util"
 	"github.com/rs/zerolog/log"
+	"go.dedis.ch/kyber/v4"
+	"go.dedis.ch/kyber/v4/pairing"
 	"net"
 	"sync"
 	"time"
@@ -32,6 +34,8 @@ type Carrier struct {
 	// Registry of message handlers. Argument must be one of the enum types
 	messageHandlers map[MessageType]func(any) error
 
+	suite *pairing.SuiteBn256
+
 	wg *sync.WaitGroup
 
 	secret string
@@ -43,12 +47,7 @@ type Config struct {
 	carrierConnMaxRetry   uint
 }
 
-// CarrierAddrs helps with importing addresses of other carriers
-type CarrierAddrs struct {
-	CarrierAddrs []string `json:"carriers"`
-}
-
-func NewCarrier(clientToCarrierAddr, carrierToCarrierAddr, frontAddr string, carrierAddrs []string) *Carrier {
+func NewCarrier(clientToCarrierAddr, carrierToCarrierAddr, frontAddr string, carriers map[string]kyber.Point, keyPair *util.KeyPair) *Carrier {
 	conf := Config{
 		carrierConnRetryDelay: util.CarrierConnRetryDelay,
 		carrierConnMaxRetry:   util.CarrierConnMaxRetry,
@@ -59,6 +58,8 @@ func NewCarrier(clientToCarrierAddr, carrierToCarrierAddr, frontAddr string, car
 	c.carrierConns = map[*net.TCPAddr]*net.TCPConn{}
 	c.mempool = make(chan []byte, 100)
 	c.quit = make(chan bool, 1)
+
+	c.suite = pairing.NewSuiteBn256()
 
 	c.messageHandlers = map[MessageType]func(any) error{}
 	c.messageHandlers[Init] = c.handleInitMessage
@@ -85,7 +86,7 @@ func NewCarrier(clientToCarrierAddr, carrierToCarrierAddr, frontAddr string, car
 	}
 
 	c.carrierAddrs = make([]*net.TCPAddr, 0)
-	for _, strAddr := range carrierAddrs {
+	for strAddr, _ := range carriers {
 		addr, err := net.ResolveTCPAddr(util.Network, strAddr)
 		if err != nil {
 			log.Error().Msgf(err.Error())
@@ -129,12 +130,13 @@ func (c *Carrier) Start() *sync.WaitGroup {
 	if err != nil {
 		log.Error().Msgf(err.Error())
 	}
-	log.Info().Msgf("Start listening to carriers on %s", c.client2carrierAddr.String())
+	log.Info().Msgf("Start listening to carriers on %s", c.carrier2carrierAddr.String())
 	go c.handleIncomingConnections(c.carrierListener, c.handleCarrierConn)
 
 	// Set up connections to other carriers
+	carrierConnsLock := &sync.RWMutex{}
 	for _, carrierAddr := range c.carrierAddrs {
-		go c.setupCarrierConnection(carrierAddr)
+		go c.setupCarrierConnection(carrierAddr, carrierConnsLock)
 	}
 
 	return c.wg

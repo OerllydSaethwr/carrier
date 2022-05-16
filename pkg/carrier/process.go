@@ -4,6 +4,7 @@ import (
 	"github.com/OerllydSaethwr/carrier/pkg/util"
 	"github.com/rs/zerolog/log"
 	"net"
+	"sync"
 	"time"
 )
 
@@ -25,12 +26,14 @@ func (c *Carrier) handleIncomingConnections(l *net.TCPListener, handler func(con
 	}
 }
 
-func (c *Carrier) setupCarrierConnection(carrierAddr *net.TCPAddr) {
+func (c *Carrier) setupCarrierConnection(carrierAddr *net.TCPAddr, carrierConnsLock *sync.RWMutex) {
 	// If carrierConnMaxRetry is 0, we keep retrying indefinitely
 	for i := uint(0); c.conf.carrierConnMaxRetry == 0 || i < c.conf.carrierConnMaxRetry; i++ {
 		conn, err := util.DialTCP(carrierAddr)
 		if err == nil {
+			carrierConnsLock.Lock()
 			c.carrierConns[carrierAddr] = conn
+			carrierConnsLock.Unlock()
 			log.Info().Msgf("Connect to carrier %s | attempt %d/%d", carrierAddr.String(), i+1, c.conf.carrierConnMaxRetry)
 			return
 		} else {

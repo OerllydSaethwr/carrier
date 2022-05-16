@@ -44,31 +44,6 @@ outerLoop:
 		c.broadcast(message)
 	}
 
-	//var err error
-	//var n int
-	//var i = 0
-	//for n, err = io.ReadAtLeast(conn, buf, util.TsxSize); err == nil; n, err = io.ReadAtLeast(conn, buf, util.TsxSize) {
-	//	var err2 error
-	//	log.Info().Msgf("Read %d bytes from %s", n, conn.RemoteAddr())
-	//
-	//	if c.nodeConn != nil {
-	//		_, err2 = c.nodeConn.Write(buf)
-	//		log.Info().Msgf("Forwarded %d bytes to %s", n, c.nodeConn.RemoteAddr())
-	//	}
-	//	if err2 != nil {
-	//		log.Error().Msgf(err2.Error())
-	//	}
-	//	i += n
-	//
-	//	// Threshold hit, initiate consensus
-	//	if i == len(buf) {
-	//		message := InitMessage{V: buf}
-	//
-	//		c.broadcast()
-	//	}
-	//}
-	//log.Info().Msgf(err.Error())
-
 	err2 := conn.Close()
 	if err2 != nil {
 		log.Error().Msgf(err2.Error())

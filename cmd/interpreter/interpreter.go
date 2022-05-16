@@ -6,7 +6,6 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"os"
-	"sync"
 )
 
 func main() {
@@ -26,8 +25,6 @@ func main() {
 	stdin := bufio.NewScanner(os.Stdin)
 	nodes := make([]*carrier.Carrier, 0)
 
-	wg := &sync.WaitGroup{}
-
 MAINLOOP:
 	for stdin.Scan() {
 		cmd := stdin.Text()
@@ -43,7 +40,7 @@ MAINLOOP:
 			zerolog.SetGlobalLevel(level)
 			log.Error().Msgf("Log level set to " + level.String())
 		case "start":
-			c := carrier.NewCarrier(wg, "", "", "", nil)
+			c := carrier.NewCarrier("", "", "", nil, nil)
 			c.Start()
 			nodes = append(nodes, c)
 			log.Error().Msgf("Carrier started")
