@@ -3,9 +3,11 @@ package carrier
 import (
 	"encoding/gob"
 	"encoding/json"
-	"errors"
+	"fmt"
+	"github.com/OerllydSaethwr/carrier/pkg/carrier/message"
 	"github.com/OerllydSaethwr/carrier/pkg/util"
 	"github.com/rs/zerolog/log"
+	"go.dedis.ch/kyber/v4/sign/bdn"
 	"io"
 	"net"
 )
@@ -22,7 +24,7 @@ func (c *Carrier) handleClientConn(conn net.Conn) {
 	// Read the incoming connection into the buffer.
 outerLoop:
 	for {
-		initMessage := &InitMessage{V: make([][]byte, 0)}
+		initMessage := &message.InitMessage{V: make([][]byte, 0)}
 		for i := 0; i < util.MempoolThreshold; i++ {
 			buf := make([]byte, util.TsxSize) //TODO make this configurable
 			_, err := io.ReadAtLeast(conn, buf, util.TsxSize)
@@ -34,14 +36,8 @@ outerLoop:
 			initMessage.V = append(initMessage.V, buf)
 		}
 
-		message := &Message{MessageType: Init}
-		payload, err := json.Marshal(initMessage)
-		if err != nil {
-			log.Error().Msgf(err.Error())
-			break outerLoop
-		}
-		message.Payload = payload
-		c.broadcast(message)
+		log.Info().Msgf("Send InitMessage")
+		c.broadcast(initMessage)
 	}
 
 	err2 := conn.Close()
@@ -54,56 +50,67 @@ outerLoop:
 func (c *Carrier) handleCarrierConn(conn net.Conn) {
 	for {
 		decoder := gob.NewDecoder(conn)
-		rawMessage := &Message{}
+		rawMessage := &message.TransportMessage{}
 		err := decoder.Decode(rawMessage)
 		if err != nil {
 			log.Error().Msgf(err.Error())
 			return
 		}
 
-		var message any
-		switch rawMessage.MessageType {
-		case Init:
-			message = &InitMessage{}
-			err = json.Unmarshal(rawMessage.Payload, message)
-			//c.messageHandlers[Init](message)
-		case Echo:
-			message = &EchoMessage{}
-			err = json.Unmarshal(rawMessage.Payload, message)
-		case Request:
-			message = &RequestMessage{}
-			err = json.Unmarshal(rawMessage.Payload, message)
-		case Resolve:
-			message = &ResolveMessage{}
-			err = json.Unmarshal(rawMessage.Payload, message)
+		var m message.Message
+		switch rawMessage.Type {
+		case message.Init:
+			m = &message.InitMessage{}
+			err = json.Unmarshal(rawMessage.Payload, m)
+		case message.Echo:
+			m = &message.EchoMessage{}
+			err = json.Unmarshal(rawMessage.Payload, m)
+		case message.Request:
+			m = &message.RequestMessage{}
+			err = json.Unmarshal(rawMessage.Payload, m)
+		case message.Resolve:
+			m = &message.ResolveMessage{}
+			err = json.Unmarshal(rawMessage.Payload, m)
 		}
 
 		if err != nil {
 			log.Error().Msgf(err.Error())
 		}
 
-		err = c.messageHandlers[rawMessage.MessageType](message)
+		err = c.messageHandlers[rawMessage.Type](m)
 		if err != nil {
 			log.Error().Msgf(err.Error())
 		}
 	}
 }
 
-func (c *Carrier) handleInitMessage(rawMessage any) error {
-	_, ok := rawMessage.(*InitMessage)
+func (c *Carrier) handleInitMessage(rawMessage message.Message) error {
+	initM, ok := rawMessage.(*message.InitMessage)
 	if !ok {
-		return errors.New("expected InitMessage")
+		return fmt.Errorf("expected InitMessage")
+	}
+
+	h := initM.Hash()
+	s, err := bdn.Sign(c.suite, c.keypair.Sk, h)
+	if err != nil {
+		return err
+	}
+
+	echoM := &message.EchoMessage{
+		H: h,
+		S: s,
 	}
 
 	log.Info().Msgf("Received InitMessage")
+	log.Info().Msgf(string(echoM.S)) //TODO remove
 
 	return nil
 }
 
-func (c *Carrier) handleEchoMessage(rawMessage any) error {
-	_, ok := rawMessage.(InitMessage)
+func (c *Carrier) handleEchoMessage(rawMessage message.Message) error {
+	_, ok := rawMessage.(*message.EchoMessage)
 	if !ok {
-		return errors.New("expected EchoMessage")
+		return fmt.Errorf("expected EchoMessage")
 	}
 
 	log.Info().Msgf("Received EchoMessage")
@@ -111,10 +118,10 @@ func (c *Carrier) handleEchoMessage(rawMessage any) error {
 	return nil
 }
 
-func (c *Carrier) handleRequestMessage(rawMessage any) error {
-	_, ok := rawMessage.(InitMessage)
+func (c *Carrier) handleRequestMessage(rawMessage message.Message) error {
+	_, ok := rawMessage.(*message.RequestMessage)
 	if !ok {
-		return errors.New("expected RequestMessage")
+		return fmt.Errorf("expected RequestMessage")
 	}
 
 	log.Info().Msgf("Received RequestMessage")
@@ -122,10 +129,10 @@ func (c *Carrier) handleRequestMessage(rawMessage any) error {
 	return nil
 }
 
-func (c *Carrier) handleResolveMessage(rawMessage any) error {
-	_, ok := rawMessage.(InitMessage)
+func (c *Carrier) handleResolveMessage(rawMessage message.Message) error {
+	_, ok := rawMessage.(*message.ResolveMessage)
 	if !ok {
-		return errors.New("expected ResolveMessage")
+		return fmt.Errorf("expected ResolveMessage")
 	}
 
 	log.Info().Msgf("Received ResolveMessage")

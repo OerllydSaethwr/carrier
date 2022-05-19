@@ -1,6 +1,7 @@
 package carrier
 
 import (
+	"github.com/OerllydSaethwr/carrier/pkg/carrier/message"
 	"github.com/OerllydSaethwr/carrier/pkg/util"
 	"github.com/rs/zerolog/log"
 	"go.dedis.ch/kyber/v4"
@@ -32,9 +33,10 @@ type Carrier struct {
 	mempool chan []byte
 
 	// Registry of message handlers. Argument must be one of the enum types
-	messageHandlers map[MessageType]func(any) error
+	messageHandlers map[message.Type]func(message.Message) error
 
-	suite *pairing.SuiteBn256
+	suite   *pairing.SuiteBn256
+	keypair *util.KeyPair
 
 	wg *sync.WaitGroup
 
@@ -47,7 +49,7 @@ type Config struct {
 	carrierConnMaxRetry   uint
 }
 
-func NewCarrier(clientToCarrierAddr, carrierToCarrierAddr, frontAddr string, carriers map[string]kyber.Point, keyPair *util.KeyPair) *Carrier {
+func NewCarrier(clientToCarrierAddr, carrierToCarrierAddr, frontAddr string, carriers map[string]kyber.Point, keypair *util.KeyPair) *Carrier {
 	conf := Config{
 		carrierConnRetryDelay: util.CarrierConnRetryDelay,
 		carrierConnMaxRetry:   util.CarrierConnMaxRetry,
@@ -60,12 +62,13 @@ func NewCarrier(clientToCarrierAddr, carrierToCarrierAddr, frontAddr string, car
 	c.quit = make(chan bool, 1)
 
 	c.suite = pairing.NewSuiteBn256()
+	c.keypair = keypair
 
-	c.messageHandlers = map[MessageType]func(any) error{}
-	c.messageHandlers[Init] = c.handleInitMessage
-	c.messageHandlers[Echo] = c.handleEchoMessage
-	c.messageHandlers[Request] = c.handleRequestMessage
-	c.messageHandlers[Resolve] = c.handleResolveMessage
+	c.messageHandlers = map[message.Type]func(message.Message) error{}
+	c.messageHandlers[message.Init] = c.handleInitMessage
+	c.messageHandlers[message.Echo] = c.handleEchoMessage
+	c.messageHandlers[message.Request] = c.handleRequestMessage
+	c.messageHandlers[message.Resolve] = c.handleResolveMessage
 	//TODO secret
 
 	var err error
@@ -136,7 +139,7 @@ func (c *Carrier) Start() *sync.WaitGroup {
 	// Set up connections to other carriers
 	carrierConnsLock := &sync.RWMutex{}
 	for _, carrierAddr := range c.carrierAddrs {
-		go c.setupCarrierConnection(carrierAddr, carrierConnsLock)
+		go c.setupCarrierConnection(carrierAddr, carrierConnsLock) //TODO goroutine
 	}
 
 	return c.wg
