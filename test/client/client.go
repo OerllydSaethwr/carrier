@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/rs/zerolog/log"
+	"math/rand"
 	"net"
 	"os"
 	"time"
@@ -32,11 +33,13 @@ func main() {
 	log.Info().Msgf("Connected")
 
 	for {
+		rand.Read(transaction)
 		_, err = conn.Write(transaction)
 		if err != nil {
 			log.Error().Msgf("Write to server failed:", err.Error())
 			os.Exit(1)
 		}
+		log.Info().Msgf("Send %d bytes to %s", len(transaction), servAddr)
 		time.Sleep(time.Duration(int64(time.Second) / int64(rate)))
 	}
 

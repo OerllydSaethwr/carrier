@@ -2,6 +2,7 @@ package carrier
 
 import (
 	"encoding/gob"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"github.com/OerllydSaethwr/carrier/pkg/carrier/message"
@@ -24,7 +25,10 @@ func (c *Carrier) handleClientConn(conn net.Conn) {
 	// Read the incoming connection into the buffer.
 outerLoop:
 	for {
-		initMessage := &message.InitMessage{V: make([][]byte, 0)}
+		initMessage := &message.InitMessage{
+			V:      make([][]byte, 0),
+			Sender: c.GetAddress(),
+		}
 		for i := 0; i < util.MempoolThreshold; i++ {
 			buf := make([]byte, util.TsxSize) //TODO make this configurable
 			_, err := io.ReadAtLeast(conn, buf, util.TsxSize)
@@ -80,6 +84,7 @@ func (c *Carrier) handleCarrierConn(conn net.Conn) {
 		err = c.messageHandlers[rawMessage.Type](m)
 		if err != nil {
 			log.Error().Msgf(err.Error())
+			panic("message handler returned error")
 		}
 	}
 }
@@ -89,6 +94,7 @@ func (c *Carrier) handleInitMessage(rawMessage message.Message) error {
 	if !ok {
 		return fmt.Errorf("expected InitMessage")
 	}
+	log.Info().Msgf("Received InitMessage from %s", initM.GetSender())
 
 	h := initM.Hash()
 	s, err := bdn.Sign(c.suite, c.keypair.Sk, h)
@@ -97,23 +103,60 @@ func (c *Carrier) handleInitMessage(rawMessage message.Message) error {
 	}
 
 	echoM := &message.EchoMessage{
-		H: h,
-		S: s,
+		H:      h,
+		S:      s,
+		Sender: c.GetAddress(),
 	}
 
-	log.Info().Msgf("Received InitMessage")
-	log.Info().Msgf(string(echoM.S)) //TODO remove
+	c.broadcast(echoM)
+
+	hstr := hex.EncodeToString(h)
+	c.locks.ValueStore.Lock()
+	c.valueStore[hstr] = initM.V
+	c.locks.ValueStore.Unlock()
 
 	return nil
 }
 
 func (c *Carrier) handleEchoMessage(rawMessage message.Message) error {
-	_, ok := rawMessage.(*message.EchoMessage)
+	var err error
+	echoM, ok := rawMessage.(*message.EchoMessage)
 	if !ok {
 		return fmt.Errorf("expected EchoMessage")
 	}
+	log.Info().Msgf("Received EchoMessage from %s", echoM.GetSender())
 
-	log.Info().Msgf("Received EchoMessage")
+	c.locks.CarrierConns.Lock()
+	pk := c.carriers[echoM.GetSender()]
+	c.locks.CarrierConns.Unlock()
+
+	err = bdn.Verify(c.suite, pk, echoM.H, echoM.S)
+	if err == nil {
+		hstr := hex.EncodeToString(echoM.H)
+		c.locks.SignatureStore.Lock()
+		c.signatureStore[hstr] = append(c.signatureStore[hstr], echoM.S)
+		c.locks.SignatureStore.Unlock()
+
+		if len(c.signatureStore[hstr]) == c.f+1 {
+			newSBSum := &SuperBlockSummary{
+				H:          echoM.H,
+				Signatures: c.signatureStore[hstr],
+			}
+			c.locks.SuperBlockSummary.Lock()
+			c.superBlockSummary = append(c.superBlockSummary, newSBSum)
+			c.locks.SuperBlockSummary.Unlock()
+		}
+	}
+
+	c.locks.SuperBlockSummary.Lock()
+	if len(c.superBlockSummary) == c.n-c.f {
+		err = c.NestedPropose(c.superBlockSummary)
+		c.superBlockSummary = make([]*SuperBlockSummary, 0)
+	}
+	c.locks.SuperBlockSummary.Unlock()
+	if err != nil {
+		return err
+	}
 
 	return nil
 }

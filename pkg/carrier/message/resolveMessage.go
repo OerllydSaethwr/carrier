@@ -16,3 +16,8 @@ func (msg *ResolveMessage) Hash() []byte {
 func (msg *ResolveMessage) Marshal() *TransportMessage {
 	return nil
 }
+
+func (msg *ResolveMessage) GetSender() string {
+	panic("not implemented")
+	return ""
+}

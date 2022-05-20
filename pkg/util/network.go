@@ -13,3 +13,8 @@ func ListenTCP(laddr *net.TCPAddr) (*net.TCPListener, error) {
 func DialTCP(raddr *net.TCPAddr) (*net.TCPConn, error) {
 	return net.DialTCP(Network, nil, raddr)
 }
+
+// ResolveTCPAddr Simple wrapper around net.ResolveTCPAddr
+func ResolveTCPAddr(address string) (*net.TCPAddr, error) {
+	return net.ResolveTCPAddr(Network, address)
+}

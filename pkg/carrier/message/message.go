@@ -22,4 +22,5 @@ type Message interface {
 	Payload() []byte
 	Hash() []byte
 	Marshal() *TransportMessage
+	GetSender() string
 }

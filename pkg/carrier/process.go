@@ -4,7 +4,6 @@ import (
 	"github.com/OerllydSaethwr/carrier/pkg/util"
 	"github.com/rs/zerolog/log"
 	"net"
-	"sync"
 	"time"
 )
 
@@ -26,18 +25,22 @@ func (c *Carrier) handleIncomingConnections(l *net.TCPListener, handler func(con
 	}
 }
 
-func (c *Carrier) setupCarrierConnection(carrierAddr *net.TCPAddr, carrierConnsLock *sync.RWMutex) {
+func (c *Carrier) setupCarrierConnection(addressStr string) {
 	// If carrierConnMaxRetry is 0, we keep retrying indefinitely
+	address, err := util.ResolveTCPAddr(addressStr)
+	if err != nil {
+		log.Error().Msgf(err.Error())
+	}
 	for i := uint(0); c.conf.carrierConnMaxRetry == 0 || i < c.conf.carrierConnMaxRetry; i++ {
-		conn, err := util.DialTCP(carrierAddr)
+		conn, err := util.DialTCP(address)
 		if err == nil {
-			carrierConnsLock.Lock()
-			c.carrierConns[carrierAddr] = conn
-			carrierConnsLock.Unlock()
-			log.Info().Msgf("Connect to carrier %s | attempt %d/%d", carrierAddr.String(), i+1, c.conf.carrierConnMaxRetry)
+			c.locks.CarrierConns.Lock()
+			c.carrierConns[addressStr] = conn
+			c.locks.CarrierConns.Unlock()
+			log.Info().Msgf("Connect to carrier %s | attempt %d/%d", address.String(), i+1, c.conf.carrierConnMaxRetry)
 			return
 		} else {
-			log.Info().Msgf("Failed to connect to carrier %s | attempt %d/%d", carrierAddr.String(), i+1, c.conf.carrierConnMaxRetry)
+			log.Info().Msgf("Failed to connect to carrier %s | attempt %d/%d", address.String(), i+1, c.conf.carrierConnMaxRetry)
 			time.Sleep(c.conf.carrierConnRetryDelay)
 		}
 	}

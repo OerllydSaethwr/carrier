@@ -7,7 +7,8 @@ import (
 )
 
 type InitMessage struct {
-	V [][]byte `json:"v"`
+	V      [][]byte `json:"v"`
+	Sender string   `json:"sender"`
 }
 
 func (msg *InitMessage) Payload() []byte {
@@ -28,4 +29,8 @@ func (msg *InitMessage) Marshal() *TransportMessage {
 		panic(err)
 	}
 	return transportMessage
+}
+
+func (msg *InitMessage) GetSender() string {
+	return msg.Sender
 }

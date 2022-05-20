@@ -38,5 +38,10 @@ func main() {
 
 // Handles incoming requests.
 func handleRequest(conn net.Conn) {
-
+	buf := make([]byte, 1024)
+	n, err := conn.Read(buf)
+	if err != nil {
+		log.Error().Msgf(err.Error())
+	}
+	log.Info().Msgf("Read %d bytes from %s", n, conn.RemoteAddr())
 }

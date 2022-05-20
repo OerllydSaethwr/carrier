@@ -4,21 +4,20 @@ import (
 	"encoding/gob"
 	"github.com/OerllydSaethwr/carrier/pkg/carrier/message"
 	"github.com/rs/zerolog/log"
-	"net"
 )
 
 func (c *Carrier) broadcast(message message.Message) {
 	transportMessage := message.Marshal()
 
-	for _, addr := range c.carrierAddrs {
+	for addr := range c.carriers {
 		c.send(addr, transportMessage)
 	}
 }
 
-func (c *Carrier) send(dest *net.TCPAddr, message *message.TransportMessage) {
+func (c *Carrier) send(dest string, message *message.TransportMessage) {
 	conn, ok := c.carrierConns[dest]
 	if !ok {
-		log.Error().Msgf("Cannot find connection to address %s", dest.String())
+		log.Error().Msgf("Cannot find connection to address %s", dest)
 		panic(1)
 		return
 	}
