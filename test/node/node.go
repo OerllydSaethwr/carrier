@@ -1,6 +1,8 @@
 package main
 
 import (
+	"encoding/json"
+	"github.com/OerllydSaethwr/carrier/pkg/carrier"
 	"github.com/rs/zerolog/log"
 	"net"
 	"os"
@@ -38,10 +40,11 @@ func main() {
 
 // Handles incoming requests.
 func handleRequest(conn net.Conn) {
-	buf := make([]byte, 1024)
-	n, err := conn.Read(buf)
+	var superBlockSummary carrier.SuperBlockSummary
+	decoder := json.NewDecoder(conn)
+	err := decoder.Decode(&superBlockSummary)
 	if err != nil {
 		log.Error().Msgf(err.Error())
 	}
-	log.Info().Msgf("Read %d bytes from %s", n, conn.RemoteAddr())
+	log.Info().Msgf("Read %s from %s", superBlockSummary, conn.RemoteAddr())
 }

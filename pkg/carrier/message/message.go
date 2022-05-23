@@ -20,7 +20,7 @@ type TransportMessage struct {
 
 type Message interface {
 	Payload() []byte
-	Hash() []byte
+	Hash() string
 	Marshal() *TransportMessage
 	GetSender() string
 }

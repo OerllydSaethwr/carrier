@@ -1,11 +1,14 @@
 package message
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"github.com/OerllydSaethwr/carrier/pkg/util"
+)
 
 type EchoMessage struct {
-	H      []byte `json:"h"`
-	S      []byte `json:"s"`
-	Sender string `json:"sender"`
+	H      string         `json:"h"`
+	S      util.Signature `json:"s"`
+	Sender string         `json:"sender"`
 }
 
 func (msg *EchoMessage) Payload() []byte {
@@ -13,9 +16,9 @@ func (msg *EchoMessage) Payload() []byte {
 	return nil
 }
 
-func (msg *EchoMessage) Hash() []byte {
+func (msg *EchoMessage) Hash() string {
 	panic("not implemented")
-	return nil
+	return ""
 }
 
 func (msg *EchoMessage) Marshal() *TransportMessage {

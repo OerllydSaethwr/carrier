@@ -23,6 +23,11 @@ type KeyPairString struct {
 	Pk   string `json:"pk"`
 }
 
+type Signature struct {
+	S  string `json:"s"`
+	Pk string `json:"pk"`
+}
+
 func NewKeyPair(sk kyber.Scalar, pk kyber.Point) *KeyPair {
 	return &KeyPair{
 		Name: xid.New().String(),
@@ -133,7 +138,7 @@ func DecodeStringToBdnPK(pk string) (kyber.Point, error) {
 	return pkk, nil
 }
 
-func ReadKeypairFile(f string) (*KeyPair, error) {
+func ReadKeypairFile(f string) (*KeyPairString, error) {
 	data, err := ioutil.ReadFile(f)
 	if err != nil {
 		return nil, err
@@ -145,12 +150,14 @@ func ReadKeypairFile(f string) (*KeyPair, error) {
 		return nil, err
 	}
 
-	kp, err := kpstr.Convert()
-	if err != nil {
-		return nil, err
-	}
+	return kpstr, nil
 
-	return kp, nil
+	//kp, err := kpstr.Convert()
+	//if err != nil {
+	//	return nil, err
+	//}
+	//
+	//return kp, nil
 }
 
 func WriteKeypairFile(f string, kp *KeyPair) error {

@@ -1,12 +1,15 @@
 package carrier
 
 import (
+	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"github.com/OerllydSaethwr/carrier/pkg/carrier/message"
 	"github.com/OerllydSaethwr/carrier/pkg/util"
 	"github.com/rs/zerolog/log"
 	"go.dedis.ch/kyber/v4"
 	"go.dedis.ch/kyber/v4/pairing"
+	"go.dedis.ch/kyber/v4/sign/bdn"
 	"net"
 	"sync"
 	"time"
@@ -15,16 +18,18 @@ import (
 type Carrier struct {
 	conf Config
 
-	clientListener  *net.TCPListener
-	carrierListener *net.TCPListener
+	clientListener   *net.TCPListener
+	carrierListener  *net.TCPListener
+	decisionListener *net.TCPListener
 
 	client2carrierAddr  string
 	carrier2carrierAddr string
 	frontAddr           string
+	decisionAddr        string
 
 	nodeConn *net.TCPConn
 
-	carriers map[string]kyber.Point
+	carriers map[string]string
 
 	// We are relying on the pointers to addresses being equal here. This means the addresses have to originate from
 	// the same source, which for now is only in the NewCarrier function. Keep in mind if you want to compute
@@ -36,12 +41,13 @@ type Carrier struct {
 	// Registry of message handlers. Argument must be one of the enum types
 	messageHandlers map[message.Type]func(message.Message) error
 
-	valueStore        map[string][][]byte
-	signatureStore    map[string][][]byte
-	superBlockSummary []*SuperBlockSummary
+	valueStore             map[string][][]byte
+	signatureStore         map[string][]util.Signature
+	superBlockSummary      []SuperBlockSummaryItem
+	superBlockSummaryStore map[string]struct{}
 
 	suite   *pairing.SuiteBn256
-	keypair *util.KeyPair
+	keypair *util.KeyPairString
 
 	locks Locks
 
@@ -66,12 +72,15 @@ type Config struct {
 	carrierConnMaxRetry   uint
 }
 
-type SuperBlockSummary struct {
-	H          []byte   `json:"h"`
-	Signatures [][]byte `json:"signatures"`
+type SuperBlockSummaryItem struct {
+	ID         string           `json:"ID"`
+	H          string           `json:"h"`
+	Signatures []util.Signature `json:"signatures"`
 }
 
-func NewCarrier(clientToCarrierAddr, carrierToCarrierAddr, frontAddr string, carriers map[string]kyber.Point, keypair *util.KeyPair) *Carrier {
+type SuperBlockSummary []SuperBlockSummaryItem
+
+func NewCarrier(clientToCarrierAddr, carrierToCarrierAddr, frontAddr, decisionAddr string, carriers map[string]string, keypair *util.KeyPairString) *Carrier {
 	conf := Config{
 		carrierConnRetryDelay: util.CarrierConnRetryDelay,
 		carrierConnMaxRetry:   util.CarrierConnMaxRetry,
@@ -100,12 +109,13 @@ func NewCarrier(clientToCarrierAddr, carrierToCarrierAddr, frontAddr string, car
 	}
 
 	c.valueStore = map[string][][]byte{}
-	c.signatureStore = map[string][][]byte{}
-	c.superBlockSummary = make([]*SuperBlockSummary, 0)
+	c.signatureStore = map[string][]util.Signature{}
+	c.superBlockSummary = make([]SuperBlockSummaryItem, 0)
 
 	c.client2carrierAddr = clientToCarrierAddr
 	c.carrier2carrierAddr = carrierToCarrierAddr
 	c.frontAddr = frontAddr
+	c.decisionAddr = decisionAddr
 	c.carriers = carriers
 
 	c.f = (len(carriers) - 1) / 3
@@ -135,7 +145,7 @@ func NewCarrier(clientToCarrierAddr, carrierToCarrierAddr, frontAddr string, car
 	}
 
 	// Check other carrier addrs
-	for strAddr, _ := range carriers {
+	for _, strAddr := range c.carriers {
 		_, err := util.ResolveTCPAddr(strAddr)
 		if err != nil {
 			log.Error().Msgf(err.Error())
@@ -168,6 +178,22 @@ func (c *Carrier) Start() *sync.WaitGroup {
 		// We will retry later
 	}
 
+	// Listen to nested SMR decisions
+	decision, err := util.ResolveTCPAddr(c.decisionAddr)
+	if err != nil {
+		log.Error().Msgf(err.Error())
+		c.wg.Done()
+		return c.wg
+	}
+	c.decisionListener, err = util.ListenTCP(decision)
+	if err != nil {
+		log.Error().Msgf(err.Error())
+		c.wg.Done()
+		return c.wg
+	}
+	log.Info().Msgf("Start listening to nested SMR decisions on %s", c.decisionAddr)
+	go c.handleIncomingConnections(c.decisionListener, c.decodeNestedSMRDecisions)
+
 	// Start client listener
 	client, err := util.ResolveTCPAddr(c.client2carrierAddr)
 	if err != nil {
@@ -199,7 +225,7 @@ func (c *Carrier) Start() *sync.WaitGroup {
 	go c.handleIncomingConnections(c.carrierListener, c.handleCarrierConn)
 
 	// Set up connections to other carriers
-	for address := range c.carriers {
+	for _, address := range c.carriers {
 		go c.setupCarrierConnection(address) //TODO goroutine
 	}
 
@@ -220,6 +246,7 @@ func (c *Carrier) GetAddress() string {
 	return c.carrier2carrierAddr
 }
 
+// TODO make this a proper retrying function and gracefully fail if cannot be established
 func (c *Carrier) retryNodeConnection() {
 	var err error
 	front, err := util.ResolveTCPAddr(c.frontAddr)
@@ -235,30 +262,98 @@ func (c *Carrier) retryNodeConnection() {
 	log.Info().Msgf("Connect to node %s", c.frontAddr)
 }
 
-func (c *Carrier) NestedPropose(P []*SuperBlockSummary) error {
+func (c *Carrier) NestedPropose(P SuperBlockSummary) error {
 	if c.nodeConn == nil {
 		c.retryNodeConnection()
 	}
 
-	data, err := json.Marshal(P)
+	encoder := json.NewEncoder(c.nodeConn)
+	err := encoder.Encode(P)
 	if err != nil {
 		return err
 	}
+	//
+	//encoder := gob.NewEncoder(c.nodeConn)
+	//err := encoder.Encode(P)
+	//if err != nil {
+	//	return err
+	//}
 
-	_, err = c.nodeConn.Write(data)
-	if err != nil {
-		return err
-	}
-
-	log.Info().Msgf("Proposed %d bytes of data to %s", len(data), c.frontAddr)
+	log.Info().Msgf("Proposed unknown bytes of data to %s", c.frontAddr)
 	return nil
 }
 
-/* TODO
-1. add command to generate key files
-2. batch transactions in local mempool
-- add stuff
-- remove stuff when threshold is hit
-3. process that watches mempool and invokes functions after threshold
+func (c *Carrier) GetStringSK() string {
+	return c.keypair.Sk
+}
 
-*/
+func (c *Carrier) GetStringPK() string {
+	return c.keypair.Pk
+}
+
+func (c *Carrier) GetKyberSK() kyber.Scalar {
+	skk, err := util.DecodeStringToBdnSK(c.keypair.Sk)
+	if err != nil {
+		panic("unable to decode SK") //TODO
+	}
+
+	return skk
+}
+
+func (c *Carrier) GetKyberPK() kyber.Point {
+	pkk, err := util.DecodeStringToBdnPK(c.keypair.Pk)
+	if err != nil {
+		panic("unable to decode SK") //TODO
+	}
+
+	return pkk
+}
+
+func (c *Carrier) Sign(h string) string {
+	hb, err := hex.DecodeString(h)
+	if err != nil {
+		panic("signing failed: failed to decode h")
+	}
+	s, err := bdn.Sign(c.suite, c.GetKyberSK(), hb)
+	if err != nil {
+		panic("signing failed")
+	}
+
+	return hex.EncodeToString(s)
+}
+
+func (c *Carrier) Verify(h string, s util.Signature) error {
+	pk, err := c.VerifyPK(s.Pk)
+	if err != nil {
+		return err
+	}
+
+	hb, err := hex.DecodeString(h)
+	if err != nil {
+		panic("verify failed: failed to decode h")
+	}
+	sb, err := hex.DecodeString(s.S)
+	if err != nil {
+		panic("verify failed: failed to decode s")
+	}
+	err = bdn.Verify(c.suite, pk, hb, sb)
+	return err
+}
+
+func (c *Carrier) VerifyPK(pk string) (kyber.Point, error) {
+	_, ok := c.carriers[pk]
+	if !ok {
+		return nil, fmt.Errorf("unrecognised sender")
+	}
+
+	pkk, err := util.DecodeStringToBdnPK(pk)
+	if err != nil {
+		return nil, err
+	}
+
+	return pkk, nil
+}
+
+func (c *Carrier) GetSuite() pairing.Suite {
+	return c.suite.Suite
+}

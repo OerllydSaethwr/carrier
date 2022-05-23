@@ -2,11 +2,10 @@ package util
 
 import (
 	"encoding/json"
-	"go.dedis.ch/kyber/v4"
 	"io/ioutil"
 )
 
-func ReadCarriersFile(filename string) (map[string]kyber.Point, error) {
+func ReadCarriersFile(filename string) (map[string]string, error) {
 	// TODO move this to util
 
 	data, err := ioutil.ReadFile(filename)
@@ -20,13 +19,13 @@ func ReadCarriersFile(filename string) (map[string]kyber.Point, error) {
 		return nil, err
 	}
 
-	carriers := map[string]kyber.Point{}
+	carriers := map[string]string{}
 	for _, c := range *carriersJSON {
-		pkk, err := DecodeStringToBdnPK(c.Pk)
+		//pkk, err := DecodeStringToBdnPK(c.Pk)
 		if err != nil {
 			return nil, err
 		}
-		carriers[c.Address] = pkk
+		carriers[c.Pk] = c.Address
 	}
 
 	return carriers, nil

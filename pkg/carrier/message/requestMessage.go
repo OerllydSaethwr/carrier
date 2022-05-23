@@ -1,7 +1,7 @@
 package message
 
 type RequestMessage struct {
-	H []byte `json:"h"`
+	H string `json:"h"`
 }
 
 func (msg *RequestMessage) Payload() []byte {
@@ -9,9 +9,9 @@ func (msg *RequestMessage) Payload() []byte {
 	return nil
 }
 
-func (msg *RequestMessage) Hash() []byte {
+func (msg *RequestMessage) Hash() string {
 	panic("not implemented")
-	return nil
+	return ""
 }
 
 func (msg *RequestMessage) Marshal() *TransportMessage {

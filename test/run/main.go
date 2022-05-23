@@ -37,11 +37,13 @@ func main() {
 	front := make([]string, 0)
 	client := make([]string, 0)
 	carrierA := make([]string, 0)
+	decision := make([]string, 0)
 
 	for i := 0; i < nodes; i++ {
 		front = append(front, address+colon+strconv.Itoa(port+i+nodes))
 		client = append(client, address+colon+strconv.Itoa(port+i+3*nodes))
 		carrierA = append(carrierA, address+colon+strconv.Itoa(port+i+4*nodes))
+		decision = append(decision, address+colon+strconv.Itoa(port+i+5*nodes))
 	}
 
 	for i := 0; i < nodes; i++ {
@@ -83,7 +85,7 @@ func main() {
 
 		// Launch carrier
 		if i != 0 {
-			cmd := exec.Command("go", "run", "cmd/cobra/carrier.go", client[i], carrierA[i], front[i], carriersFile, testPath+".carrier-"+strconv.Itoa(i)+".json")
+			cmd := exec.Command("go", "run", "cmd/cobra/carrier.go", client[i], carrierA[i], front[i], decision[i], carriersFile, testPath+".carrier-"+strconv.Itoa(i)+".json")
 			cmd.Stdout = carrierLog
 			cmd.Stderr = carrierLog
 			err = cmd.Start()
@@ -128,7 +130,7 @@ func main() {
 	os.Stdout = logfile
 	os.Stderr = logfile
 
-	c := carrier.NewCarrier(client[0], carrierA[0], front[0], carriers, kp)
+	c := carrier.NewCarrier(client[0], carrierA[0], front[0], decision[0], carriers, kp)
 	wg := c.Start()
 
 	wg.Wait()

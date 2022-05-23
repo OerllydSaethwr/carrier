@@ -3,6 +3,7 @@ package message
 import (
 	"bytes"
 	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 )
 
@@ -15,9 +16,9 @@ func (msg *InitMessage) Payload() []byte {
 	return bytes.Join(msg.V, nil)
 }
 
-func (msg *InitMessage) Hash() []byte {
+func (msg *InitMessage) Hash() string {
 	h := sha256.Sum256(msg.Payload())
-	return h[:]
+	return hex.EncodeToString(h[:])
 }
 
 func (msg *InitMessage) Marshal() *TransportMessage {

@@ -9,7 +9,7 @@ import (
 func (c *Carrier) broadcast(message message.Message) {
 	transportMessage := message.Marshal()
 
-	for addr := range c.carriers {
+	for _, addr := range c.carriers {
 		c.send(addr, transportMessage)
 	}
 }

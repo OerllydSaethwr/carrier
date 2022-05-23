@@ -18,8 +18,9 @@ const (
 	client2carrier  = 0
 	carrier2carrier = 1
 	front           = 2
-	carriersf       = 3
-	keypairf        = 4
+	decision        = 3
+	carriersf       = 4
+	keypairf        = 5
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -54,13 +55,14 @@ func init() {
 }
 
 func validateCarrier(cmd *cobra.Command, args []string) error {
-	if len(args) < 5 {
-		return fmt.Errorf("requires <client2carrier> <carrier2carrier> <front> <carriers_file> <key_file>")
+	if len(args) < 6 {
+		return fmt.Errorf("requires <client2carrier> <carrier2carrier> <front> <decision> <carriers_file> <key_file>")
 	}
 
 	clientToCarrierAddr := args[client2carrier]
 	carrierToCarrierAddr := args[carrier2carrier]
 	frontAddr := args[front]
+	decisionAddr := args[decision]
 	carriersFile := args[carriersf]
 	keyPairFile := args[keypairf]
 
@@ -79,6 +81,11 @@ func validateCarrier(cmd *cobra.Command, args []string) error {
 	hostp = net.ParseIP(host)
 	if err != nil || hostp == nil {
 		return fmt.Errorf("<front> %s", err.Error())
+	}
+	host, _, err = net.SplitHostPort(decisionAddr)
+	hostp = net.ParseIP(host)
+	if err != nil || hostp == nil {
+		return fmt.Errorf("<decision> %s", err.Error())
 	}
 
 	// Check we can open carriersFile
@@ -99,6 +106,7 @@ func runCarrier(cmd *cobra.Command, args []string) error {
 	clientToCarrierAddr := args[client2carrier]
 	carrierToCarrierAddr := args[carrier2carrier]
 	frontAddr := args[front]
+	decisionAddr := args[decision]
 	carriersFile := args[carriersf]
 	keyPairFile := args[keypairf]
 
@@ -112,7 +120,7 @@ func runCarrier(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	c := carrier.NewCarrier(clientToCarrierAddr, carrierToCarrierAddr, frontAddr, carriers, kp)
+	c := carrier.NewCarrier(clientToCarrierAddr, carrierToCarrierAddr, frontAddr, decisionAddr, carriers, kp)
 	wg := c.Start()
 
 	wg.Wait()
