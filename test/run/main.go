@@ -96,7 +96,7 @@ func main() {
 		}
 
 		// Launch node
-		cmd := exec.Command("go", "run", testPath+"node/node.go", front[i])
+		cmd := exec.Command("go", "run", testPath+"node/node.go", front[i], decision[i])
 		cmd.Stdout = nodeLog
 		cmd.Stderr = nodeLog
 		err = cmd.Start()

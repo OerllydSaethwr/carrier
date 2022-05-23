@@ -1,11 +1,12 @@
 package carrier
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"github.com/OerllydSaethwr/carrier/pkg/carrier/message"
 	"github.com/OerllydSaethwr/carrier/pkg/util"
 	"github.com/rs/xid"
-	"github.com/rs/zerolog/log"
 )
 
 func (c *Carrier) handleInitMessage(rawMessage message.Message) error {
@@ -13,7 +14,7 @@ func (c *Carrier) handleInitMessage(rawMessage message.Message) error {
 	if !ok {
 		return fmt.Errorf("expected InitMessage")
 	}
-	log.Info().Msgf("Received InitMessage from %s", initM.GetSender())
+	//log.Info().Msgf("received InitMessage from %s", initM.GetSender())
 
 	h := initM.Hash()
 
@@ -22,11 +23,11 @@ func (c *Carrier) handleInitMessage(rawMessage message.Message) error {
 		Pk: c.GetStringPK(),
 	}
 
-	echoM := &message.EchoMessage{
-		H:      h,
-		S:      s,
-		Sender: c.GetAddress(),
-	}
+	echoM := message.NewEchoMessage(
+		h,
+		s,
+		c.GetAddress(),
+	)
 
 	c.broadcast(echoM)
 
@@ -43,7 +44,6 @@ func (c *Carrier) handleEchoMessage(rawMessage message.Message) error {
 	if !ok {
 		return fmt.Errorf("expected EchoMessage")
 	}
-	log.Info().Msgf("Received EchoMessage from %s", echoM.GetSender())
 
 	err = c.Verify(echoM.H, echoM.S)
 	if err == nil {
@@ -53,9 +53,9 @@ func (c *Carrier) handleEchoMessage(rawMessage message.Message) error {
 
 		if len(c.signatureStore[echoM.H]) == c.f+1 {
 			newSBSum := SuperBlockSummaryItem{
-				ID:         xid.New().String(),
-				H:          echoM.H,
-				Signatures: c.signatureStore[echoM.H],
+				ID: xid.New().String(),
+				H:  echoM.H,
+				S:  c.signatureStore[echoM.H],
 			}
 			c.locks.SuperBlockSummary.Lock()
 			c.superBlockSummary = append(c.superBlockSummary, newSBSum)
@@ -77,31 +77,66 @@ func (c *Carrier) handleEchoMessage(rawMessage message.Message) error {
 }
 
 func (c *Carrier) handleRequestMessage(rawMessage message.Message) error {
-	_, ok := rawMessage.(*message.RequestMessage)
+	requestM, ok := rawMessage.(*message.RequestMessage)
 	if !ok {
 		return fmt.Errorf("expected RequestMessage")
 	}
 
-	log.Info().Msgf("Received RequestMessage")
+	c.locks.ValueStore.Lock()
+	defer c.locks.ValueStore.Unlock()
+	if v, ok := c.valueStore[requestM.H]; ok {
+		resolveM := message.NewResolveMessage(
+			requestM.H,
+			v,
+		)
+		c.marshalAndSend(requestM.GetSender(), resolveM)
+	}
 
 	return nil
 }
 
 func (c *Carrier) handleResolveMessage(rawMessage message.Message) error {
-	_, ok := rawMessage.(*message.ResolveMessage)
+	resolveM, ok := rawMessage.(*message.ResolveMessage)
 	if !ok {
 		return fmt.Errorf("expected ResolveMessage")
 	}
 
-	log.Info().Msgf("Received ResolveMessage")
+	hb := sha256.Sum256(resolveM.Payload())
+	h := hex.EncodeToString(hb[:])
+	if resolveM.H == h {
+		c.locks.ValueStore.Lock()
+		c.valueStore[h] = resolveM.V
+		c.locks.ValueStore.Unlock()
+	}
+
+	//TODO add locks
+	if _, ok := c.acceptedHashStore[h]; ok {
+		c.acceptedHashStore[h] = resolveM.V
+	}
 
 	return nil
 }
 
-func (c *Carrier) handleNestedSMRDecision(N SuperBlockSummary) {
-	//for _, superBlockSummaryItem := range N {
-	//	for _, s := range superBlockSummaryItem.Signatures {
-	//		//bdn.Verify(c.suite, pk, superBlockSummaryItem.H, s)
-	//	}
-	//}
+func (c *Carrier) handleNestedSMRDecision(N SuperBlockSummary) error {
+outer:
+	for _, hs := range N {
+		if len(hs.S) != c.f+1 {
+			continue outer
+		}
+		for _, s := range hs.S {
+			err := c.Verify(hs.H, s)
+			if err != nil {
+				continue outer
+			}
+		}
+
+		if _, ok := c.valueStore[hs.H]; ok {
+			c.acceptedHashStore[hs.H] = c.valueStore[hs.H]
+		} else {
+			c.acceptedHashStore[hs.H] = nil
+			c.broadcast(message.NewRequestMessage(hs.H, c.GetAddress()))
+		}
+	}
+
+	return nil
 }

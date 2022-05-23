@@ -6,6 +6,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"net"
 	"os"
+	"time"
 )
 
 const (
@@ -16,6 +17,7 @@ const (
 
 func main() {
 	CONN_HOST := os.Args[1]
+	decision := os.Args[2]
 	// Listen for incoming connections.
 	l, err := net.Listen(CONN_TYPE, CONN_HOST)
 	if err != nil {
@@ -34,17 +36,42 @@ func main() {
 		}
 		log.Info().Msgf("Accepted")
 		// Handle connections in a new goroutine.
-		go handleRequest(conn)
+		go handleRequest(conn, decision)
 	}
 }
 
 // Handles incoming requests.
-func handleRequest(conn net.Conn) {
+func handleRequest(conn net.Conn, da string) {
 	var superBlockSummary carrier.SuperBlockSummary
 	decoder := json.NewDecoder(conn)
-	err := decoder.Decode(&superBlockSummary)
+
+	decision := setupDecisionConn(da)
+	encoder := json.NewEncoder(decision)
+	for {
+		err := decoder.Decode(&superBlockSummary)
+		if err != nil {
+			log.Error().Msgf(err.Error())
+		}
+		log.Info().Msgf("Read %s from %s", superBlockSummary, conn.RemoteAddr())
+
+		time.Sleep(time.Millisecond * 100)
+		err = encoder.Encode(&superBlockSummary)
+		if err != nil {
+			log.Error().Msgf(err.Error())
+		}
+		log.Info().Msgf("Sent %s to %s", superBlockSummary, da)
+	}
+}
+
+func setupDecisionConn(a string) *net.TCPConn {
+	ar, err := net.ResolveTCPAddr("tcp", a)
 	if err != nil {
 		log.Error().Msgf(err.Error())
 	}
-	log.Info().Msgf("Read %s from %s", superBlockSummary, conn.RemoteAddr())
+	conn, err := net.DialTCP("tcp", nil, ar)
+	if err != nil {
+		log.Error().Msgf(err.Error())
+	}
+
+	return conn
 }

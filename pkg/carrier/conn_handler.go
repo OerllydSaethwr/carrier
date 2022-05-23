@@ -22,10 +22,10 @@ func (c *Carrier) handleClientConn(conn net.Conn) {
 	// Read the incoming connection into the buffer.
 outerLoop:
 	for {
-		initMessage := &message.InitMessage{
-			V:      make([][]byte, 0),
-			Sender: c.GetAddress(),
-		}
+		initMessage := message.NewInitMessage(
+			make([][]byte, 0),
+			c.GetAddress(),
+		)
 		for i := 0; i < util.MempoolThreshold; i++ {
 			buf := make([]byte, util.TsxSize) //TODO make this configurable
 			_, err := io.ReadAtLeast(conn, buf, util.TsxSize)
@@ -37,7 +37,6 @@ outerLoop:
 			initMessage.V = append(initMessage.V, buf)
 		}
 
-		log.Info().Msgf("Send InitMessage")
 		c.broadcast(initMessage)
 	}
 
@@ -57,6 +56,7 @@ func (c *Carrier) handleCarrierConn(conn net.Conn) {
 			log.Error().Msgf(err.Error())
 			return
 		}
+		log.Info().Msgf("Received %s from %s", rawMessage.Type, conn.RemoteAddr())
 
 		var m message.Message
 		switch rawMessage.Type {
@@ -92,8 +92,15 @@ func (c *Carrier) decodeNestedSMRDecisions(conn net.Conn) {
 		var superBlockSummary SuperBlockSummary
 		err := decoder.Decode(&superBlockSummary)
 		if err != nil {
-			return
+			//log.Error().Msgf(err.Error())
+			//continue //TODO
+			panic(err.Error())
 		}
-
+		log.Info().Msgf("received nested SMR decision from %s", conn.RemoteAddr())
+		err = c.handleNestedSMRDecision(superBlockSummary)
+		if err != nil {
+			//log.Error().Msgf(err.Error()) //TODO
+			panic(err.Error())
+		}
 	}
 }

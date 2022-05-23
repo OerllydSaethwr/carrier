@@ -7,6 +7,7 @@ import (
 )
 
 func (c *Carrier) broadcast(message message.Message) {
+	log.Info().Msgf("Broadcast %s", message.GetType())
 	transportMessage := message.Marshal()
 
 	for _, addr := range c.carriers {
@@ -29,4 +30,8 @@ func (c *Carrier) send(dest string, message *message.TransportMessage) {
 	if err != nil {
 		log.Error().Msgf(err.Error())
 	}
+}
+
+func (c *Carrier) marshalAndSend(dest string, message message.Message) {
+	c.send(dest, message.Marshal())
 }

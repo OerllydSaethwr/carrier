@@ -1,7 +1,15 @@
 package message
 
 type RequestMessage struct {
-	H string `json:"h"`
+	H      string `json:"h"`
+	Sender string `json:"sender"`
+}
+
+func NewRequestMessage(h string, sender string) *RequestMessage {
+	return &RequestMessage{
+		H:      h,
+		Sender: sender,
+	}
 }
 
 func (msg *RequestMessage) Payload() []byte {
@@ -20,6 +28,9 @@ func (msg *RequestMessage) Marshal() *TransportMessage {
 }
 
 func (msg *RequestMessage) GetSender() string {
-	panic("not implemented")
-	return ""
+	return msg.Sender
+}
+
+func (msg *RequestMessage) GetType() Type {
+	return Request
 }

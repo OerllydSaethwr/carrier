@@ -11,6 +11,14 @@ type EchoMessage struct {
 	Sender string         `json:"sender"`
 }
 
+func NewEchoMessage(h string, s util.Signature, sender string) *EchoMessage {
+	return &EchoMessage{
+		H:      h,
+		S:      s,
+		Sender: sender,
+	}
+}
+
 func (msg *EchoMessage) Payload() []byte {
 	panic("not implemented")
 	return nil
@@ -34,4 +42,8 @@ func (msg *EchoMessage) Marshal() *TransportMessage {
 
 func (msg *EchoMessage) GetSender() string {
 	return msg.Sender
+}
+
+func (msg *EchoMessage) GetType() Type {
+	return Echo
 }

@@ -45,6 +45,7 @@ type Carrier struct {
 	signatureStore         map[string][]util.Signature
 	superBlockSummary      []SuperBlockSummaryItem
 	superBlockSummaryStore map[string]struct{}
+	acceptedHashStore      map[string][][]byte
 
 	suite   *pairing.SuiteBn256
 	keypair *util.KeyPairString
@@ -73,9 +74,9 @@ type Config struct {
 }
 
 type SuperBlockSummaryItem struct {
-	ID         string           `json:"ID"`
-	H          string           `json:"h"`
-	Signatures []util.Signature `json:"signatures"`
+	ID string           `json:"ID"`
+	H  string           `json:"h"`
+	S  []util.Signature `json:"s"`
 }
 
 type SuperBlockSummary []SuperBlockSummaryItem
@@ -111,6 +112,7 @@ func NewCarrier(clientToCarrierAddr, carrierToCarrierAddr, frontAddr, decisionAd
 	c.valueStore = map[string][][]byte{}
 	c.signatureStore = map[string][]util.Signature{}
 	c.superBlockSummary = make([]SuperBlockSummaryItem, 0)
+	c.acceptedHashStore = map[string][][]byte{}
 
 	c.client2carrierAddr = clientToCarrierAddr
 	c.carrier2carrierAddr = carrierToCarrierAddr

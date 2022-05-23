@@ -12,6 +12,13 @@ type InitMessage struct {
 	Sender string   `json:"sender"`
 }
 
+func NewInitMessage(v [][]byte, sender string) *InitMessage {
+	return &InitMessage{
+		V:      v,
+		Sender: sender,
+	}
+}
+
 func (msg *InitMessage) Payload() []byte {
 	return bytes.Join(msg.V, nil)
 }
@@ -34,4 +41,8 @@ func (msg *InitMessage) Marshal() *TransportMessage {
 
 func (msg *InitMessage) GetSender() string {
 	return msg.Sender
+}
+
+func (msg *InitMessage) GetType() Type {
+	return Init
 }

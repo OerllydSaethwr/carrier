@@ -23,4 +23,5 @@ type Message interface {
 	Hash() string
 	Marshal() *TransportMessage
 	GetSender() string
+	GetType() Type
 }
