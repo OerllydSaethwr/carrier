@@ -6,16 +6,16 @@ import (
 )
 
 type EchoMessage struct {
-	H      string         `json:"h"`
-	S      util.Signature `json:"s"`
-	Sender string         `json:"sender"`
+	H        string         `json:"h"`
+	S        util.Signature `json:"s"`
+	SenderID string         `json:"senderID"`
 }
 
-func NewEchoMessage(h string, s util.Signature, sender string) *EchoMessage {
+func NewEchoMessage(h string, s util.Signature, senderID string) *EchoMessage {
 	return &EchoMessage{
-		H:      h,
-		S:      s,
-		Sender: sender,
+		H:        h,
+		S:        s,
+		SenderID: senderID,
 	}
 }
 
@@ -30,7 +30,7 @@ func (msg *EchoMessage) Hash() string {
 }
 
 func (msg *EchoMessage) Marshal() *TransportMessage {
-	transportMessage := &TransportMessage{Type: Echo}
+	transportMessage := &TransportMessage{Type: msg.GetType()}
 	payload, err := json.Marshal(msg)
 	transportMessage.Payload = payload
 	if err != nil {
@@ -40,8 +40,8 @@ func (msg *EchoMessage) Marshal() *TransportMessage {
 	return transportMessage
 }
 
-func (msg *EchoMessage) GetSender() string {
-	return msg.Sender
+func (msg *EchoMessage) GetSenderID() string {
+	return msg.SenderID
 }
 
 func (msg *EchoMessage) GetType() Type {

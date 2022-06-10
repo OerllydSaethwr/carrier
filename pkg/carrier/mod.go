@@ -10,67 +10,70 @@ import (
 	"go.dedis.ch/kyber/v4"
 	"go.dedis.ch/kyber/v4/pairing"
 	"go.dedis.ch/kyber/v4/sign/bdn"
+	"io/ioutil"
 	"net"
 	"sync"
 	"time"
 )
 
 type Carrier struct {
-	conf Config
+	config Config
 
-	clientListener   *net.TCPListener
-	carrierListener  *net.TCPListener
-	decisionListener *net.TCPListener
+	id string
 
-	client2carrierAddr  string
-	carrier2carrierAddr string
-	frontAddr           string
-	decisionAddr        string
+	listeners Listeners
+	stores    Stores
+	locks     Locks
+	addresses Addresses
 
 	nodeConn *net.TCPConn
 
-	carriers map[string]string
-
-	// We are relying on the pointers to addresses being equal here. This means the addresses have to originate from
-	// the same source, which for now is only in the NewCarrier function. Keep in mind if you want to compute
-	// addresses, this will break
-	carrierConns map[string]*net.TCPConn
-
-	mempool chan []byte
+	neighbours map[string]*Neighbour
 
 	// Registry of message handlers. Argument must be one of the enum types
 	messageHandlers map[message.Type]func(message.Message) error
 
-	valueStore             map[string][][]byte
-	signatureStore         map[string][]util.Signature
-	superBlockSummary      []SuperBlockSummaryItem
-	superBlockSummaryStore map[string]struct{}
-	acceptedHashStore      map[string][][]byte
-
 	suite   *pairing.SuiteBn256
 	keypair *util.KeyPairString
-
-	locks Locks
 
 	f int
 	n int
 
 	wg *sync.WaitGroup
 
-	secret string
-	quit   chan bool
+	quit chan bool
 }
 
 type Locks struct {
-	CarrierConns      *sync.RWMutex
 	ValueStore        *sync.RWMutex
 	SignatureStore    *sync.RWMutex
 	SuperBlockSummary *sync.RWMutex
+	AcceptedHashStore *sync.RWMutex
+}
+
+type Stores struct {
+	valueStore        map[string][][]byte
+	signatureStore    map[string][]util.Signature
+	superBlockSummary []SuperBlockSummaryItem
+	acceptedHashStore map[string][][]byte
+}
+
+type Listeners struct {
+	clientListener   *net.TCPListener
+	carrierListener  *net.TCPListener
+	decisionListener *net.TCPListener
 }
 
 type Config struct {
 	carrierConnRetryDelay time.Duration
 	carrierConnMaxRetry   uint
+}
+
+type Addresses struct {
+	client2carrier  string
+	carrier2carrier string
+	front           string
+	decision        string
 }
 
 type SuperBlockSummaryItem struct {
@@ -81,47 +84,75 @@ type SuperBlockSummaryItem struct {
 
 type SuperBlockSummary []SuperBlockSummaryItem
 
-func NewCarrier(clientToCarrierAddr, carrierToCarrierAddr, frontAddr, decisionAddr string, carriers map[string]string, keypair *util.KeyPairString) *Carrier {
-	conf := Config{
-		carrierConnRetryDelay: util.CarrierConnRetryDelay,
-		carrierConnMaxRetry:   util.CarrierConnMaxRetry,
+func Load(file string) (*Carrier, error) {
+	// Read config file
+	rawdata, err := ioutil.ReadFile(file)
+	if err != nil {
+		return nil, err
 	}
 
+	config := &util.Config{}
+	err = json.Unmarshal(rawdata, config)
+	if err != nil {
+		return nil, err
+	}
+
+	// Create carrier.Neighbour structs and collect them into a map for fast access
+	neighbours := map[string]*Neighbour{}
+	for _, n := range config.Neighbours {
+		neighbours[n.ID] = NewNeighbour(n.ID, n.Address, n.PK)
+	}
+
+	// Build a new carrier node
+	return NewCarrier(config.ID, config.Addresses.Client, config.Addresses.Carrier, config.Addresses.Front, config.Addresses.Decision, neighbours, &config.Keys), nil
+}
+
+func NewCarrier(id, clientToCarrierAddr, carrierToCarrierAddr, frontAddr, decisionAddr string, carriers map[string]*Neighbour, keypair *util.KeyPairString) *Carrier {
+
 	c := &Carrier{}
-	c.conf = conf
-	c.carrierConns = map[string]*net.TCPConn{}
-	c.mempool = make(chan []byte, 100)
 	c.quit = make(chan bool, 1)
+	c.id = id
 
 	c.suite = pairing.NewSuiteBn256()
 	c.keypair = keypair
 
-	c.messageHandlers = map[message.Type]func(message.Message) error{}
-	c.messageHandlers[message.Init] = c.handleInitMessage
-	c.messageHandlers[message.Echo] = c.handleEchoMessage
-	c.messageHandlers[message.Request] = c.handleRequestMessage
-	c.messageHandlers[message.Resolve] = c.handleResolveMessage
-
-	c.locks = Locks{
-		CarrierConns:      &sync.RWMutex{},
-		ValueStore:        &sync.RWMutex{},
-		SignatureStore:    &sync.RWMutex{},
-		SuperBlockSummary: &sync.RWMutex{},
-	}
-
-	c.valueStore = map[string][][]byte{}
-	c.signatureStore = map[string][]util.Signature{}
-	c.superBlockSummary = make([]SuperBlockSummaryItem, 0)
-	c.acceptedHashStore = map[string][][]byte{}
-
-	c.client2carrierAddr = clientToCarrierAddr
-	c.carrier2carrierAddr = carrierToCarrierAddr
-	c.frontAddr = frontAddr
-	c.decisionAddr = decisionAddr
-	c.carriers = carriers
+	c.neighbours = carriers
 
 	c.f = (len(carriers) - 1) / 3
 	c.n = len(carriers)
+
+	c.config = Config{
+		carrierConnRetryDelay: util.CarrierConnRetryDelay,
+		carrierConnMaxRetry:   util.CarrierConnMaxRetry,
+	}
+
+	c.messageHandlers = map[message.Type]func(message.Message) error{
+		message.Init:    c.handleInitMessage,
+		message.Echo:    c.handleEchoMessage,
+		message.Request: c.handleRequestMessage,
+		message.Resolve: c.handleResolveMessage,
+	}
+
+	c.locks = Locks{
+		ValueStore:        &sync.RWMutex{},
+		SignatureStore:    &sync.RWMutex{},
+		SuperBlockSummary: &sync.RWMutex{},
+		AcceptedHashStore: &sync.RWMutex{},
+	}
+
+	c.stores = Stores{
+		valueStore:        map[string][][]byte{},
+		signatureStore:    map[string][]util.Signature{},
+		superBlockSummary: make([]SuperBlockSummaryItem, 0),
+		acceptedHashStore: map[string][][]byte{},
+	}
+
+	c.addresses = Addresses{
+		client2carrier:  clientToCarrierAddr,
+		carrier2carrier: carrierToCarrierAddr,
+		front:           frontAddr,
+		decision:        decisionAddr,
+	}
 
 	var err error
 
@@ -147,8 +178,8 @@ func NewCarrier(clientToCarrierAddr, carrierToCarrierAddr, frontAddr, decisionAd
 	}
 
 	// Check other carrier addrs
-	for _, strAddr := range c.carriers {
-		_, err := util.ResolveTCPAddr(strAddr)
+	for _, n := range c.neighbours {
+		_, err := util.ResolveTCPAddr(n.Address)
 		if err != nil {
 			log.Error().Msgf(err.Error())
 		}
@@ -168,7 +199,7 @@ func (c *Carrier) Start() *sync.WaitGroup {
 	var err error
 
 	// Connect to node
-	front, err := util.ResolveTCPAddr(c.frontAddr)
+	front, err := util.ResolveTCPAddr(c.getFrontAddress())
 	if err != nil {
 		log.Error().Msgf(err.Error())
 		c.wg.Done()
@@ -176,67 +207,67 @@ func (c *Carrier) Start() *sync.WaitGroup {
 	}
 	c.nodeConn, err = util.DialTCP(front)
 	if err != nil {
-		log.Error().Msgf("Failed to connect to node %s", err.Error())
+		log.Error().Msgf("failed to connect to node %s", err.Error())
 		// We will retry later
 	}
 
 	// Listen to nested SMR decisions
-	decision, err := util.ResolveTCPAddr(c.decisionAddr)
+	decision, err := util.ResolveTCPAddr(c.getDecisionAddress())
 	if err != nil {
 		log.Error().Msgf(err.Error())
 		c.wg.Done()
 		return c.wg
 	}
-	c.decisionListener, err = util.ListenTCP(decision)
+	c.listeners.decisionListener, err = util.ListenTCP(decision)
 	if err != nil {
 		log.Error().Msgf(err.Error())
 		c.wg.Done()
 		return c.wg
 	}
-	log.Info().Msgf("Start listening to nested SMR decisions on %s", c.decisionAddr)
-	go c.handleIncomingConnections(c.decisionListener, c.decodeNestedSMRDecisions)
+	log.Info().Msgf("start listening to nested SMR decisions on %s", c.getDecisionAddress())
+	go c.handleIncomingConnections(c.listeners.decisionListener, c.decodeNestedSMRDecisions)
 
 	// Start client listener
-	client, err := util.ResolveTCPAddr(c.client2carrierAddr)
+	client, err := util.ResolveTCPAddr(c.getClientToCarrierAddress())
 	if err != nil {
 		log.Error().Msgf(err.Error())
 		c.wg.Done()
 		return c.wg
 	}
-	c.clientListener, err = util.ListenTCP(client)
+	c.listeners.clientListener, err = util.ListenTCP(client)
 	if err != nil {
 		log.Error().Msgf(err.Error())
 		c.wg.Done()
 		return c.wg
 	}
-	log.Info().Msgf("Start listening to client on %s", c.client2carrierAddr)
-	go c.handleIncomingConnections(c.clientListener, c.handleClientConn)
+	log.Info().Msgf("start listening to client on %s", c.getClientToCarrierAddress())
+	go c.handleIncomingConnections(c.listeners.clientListener, c.handleClientConn)
 
 	// Start carrier listener
-	carrier, err := util.ResolveTCPAddr(c.carrier2carrierAddr)
+	carrier, err := util.ResolveTCPAddr(c.getCarrierToCarrierAddress())
 	if err != nil {
 		log.Error().Msgf(err.Error())
 		c.wg.Done()
 		return c.wg
 	}
-	c.carrierListener, err = util.ListenTCP(carrier)
+	c.listeners.carrierListener, err = util.ListenTCP(carrier)
 	if err != nil {
 		log.Error().Msgf(err.Error())
 	}
-	log.Info().Msgf("Start listening to carriers on %s", c.carrier2carrierAddr)
-	go c.handleIncomingConnections(c.carrierListener, c.handleCarrierConn)
+	log.Info().Msgf("start listening to neighbours on %s", c.getCarrierToCarrierAddress())
+	go c.handleIncomingConnections(c.listeners.carrierListener, c.handleCarrierConn)
 
-	// Set up connections to other carriers
-	for _, address := range c.carriers {
-		go c.setupCarrierConnection(address) //TODO goroutine
+	// Set up connections to other neighbours
+	for _, n := range c.neighbours {
+		go n.connect(c.config.carrierConnRetryDelay, c.config.carrierConnMaxRetry)
 	}
 
 	return c.wg
 }
 
 func (c *Carrier) Stop() {
-	log.Trace().Msgf("Stop Carrier")
-	err := c.clientListener.Close()
+	log.Trace().Msgf("stop Carrier")
+	err := c.listeners.clientListener.Close()
 	if err != nil {
 		log.Error().Msgf(err.Error())
 	}
@@ -245,13 +276,13 @@ func (c *Carrier) Stop() {
 }
 
 func (c *Carrier) GetAddress() string {
-	return c.carrier2carrierAddr
+	return c.getCarrierToCarrierAddress()
 }
 
 // TODO make this a proper retrying function and gracefully fail if cannot be established
 func (c *Carrier) retryNodeConnection() {
 	var err error
-	front, err := util.ResolveTCPAddr(c.frontAddr)
+	front, err := util.ResolveTCPAddr(c.getFrontAddress())
 	if err != nil {
 		log.Error().Msgf(err.Error())
 		return
@@ -261,7 +292,7 @@ func (c *Carrier) retryNodeConnection() {
 	if err != nil {
 		log.Error().Msgf(err.Error())
 	}
-	log.Info().Msgf("Connect to node %s", c.frontAddr)
+	log.Info().Msgf("connect to node %s", c.getFrontAddress())
 }
 
 func (c *Carrier) NestedPropose(P SuperBlockSummary) error {
@@ -281,7 +312,7 @@ func (c *Carrier) NestedPropose(P SuperBlockSummary) error {
 	//	return err
 	//}
 
-	log.Info().Msgf("Proposed unknown bytes of data to %s", c.frontAddr)
+	log.Info().Msgf("proposed unknown bytes of data to %s", c.getFrontAddress())
 	return nil
 }
 
@@ -325,7 +356,7 @@ func (c *Carrier) Sign(h string) string {
 }
 
 func (c *Carrier) Verify(h string, s util.Signature) error {
-	pk, err := c.VerifyPK(s.Pk)
+	pk, err := c.GetPKFromID(s.SenderID)
 	if err != nil {
 		return err
 	}
@@ -342,13 +373,28 @@ func (c *Carrier) Verify(h string, s util.Signature) error {
 	return err
 }
 
-func (c *Carrier) VerifyPK(pk string) (kyber.Point, error) {
-	_, ok := c.carriers[pk]
+//func (c *Carrier) VerifyPK(pk string) (kyber.Point, error) {
+//	//_, ok := c.neighbours[pk]
+//	//if !ok {
+//	//	return nil, fmt.Errorf("unrecognised sender")
+//	//}
+//
+//	pkk, err := util.DecodeStringToBdnPK(pk)
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	return pkk, nil
+//}
+
+func (c *Carrier) GetPKFromID(senderID string) (kyber.Point, error) {
+
+	n, ok := c.neighbours[senderID]
 	if !ok {
-		return nil, fmt.Errorf("unrecognised sender")
+		return nil, fmt.Errorf("pk not found in store")
 	}
 
-	pkk, err := util.DecodeStringToBdnPK(pk)
+	pkk, err := util.DecodeStringToBdnPK(n.PK)
 	if err != nil {
 		return nil, err
 	}
@@ -358,4 +404,28 @@ func (c *Carrier) VerifyPK(pk string) (kyber.Point, error) {
 
 func (c *Carrier) GetSuite() pairing.Suite {
 	return c.suite.Suite
+}
+
+func (c *Carrier) decide(D map[string][][]byte) {
+
+}
+
+func (c *Carrier) getFrontAddress() string {
+	return c.addresses.front
+}
+
+func (c *Carrier) getClientToCarrierAddress() string {
+	return c.addresses.client2carrier
+}
+
+func (c *Carrier) getCarrierToCarrierAddress() string {
+	return c.addresses.carrier2carrier
+}
+
+func (c *Carrier) getDecisionAddress() string {
+	return c.addresses.decision
+}
+
+func (c *Carrier) GetID() string {
+	return c.id
 }

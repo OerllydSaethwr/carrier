@@ -8,14 +8,14 @@ import (
 )
 
 type InitMessage struct {
-	V      [][]byte `json:"v"`
-	Sender string   `json:"sender"`
+	V        [][]byte `json:"v"`
+	SenderID string   `json:"senderID"`
 }
 
-func NewInitMessage(v [][]byte, sender string) *InitMessage {
+func NewInitMessage(v [][]byte, senderID string) *InitMessage {
 	return &InitMessage{
-		V:      v,
-		Sender: sender,
+		V:        v,
+		SenderID: senderID,
 	}
 }
 
@@ -29,7 +29,7 @@ func (msg *InitMessage) Hash() string {
 }
 
 func (msg *InitMessage) Marshal() *TransportMessage {
-	transportMessage := &TransportMessage{Type: Init}
+	transportMessage := &TransportMessage{Type: msg.GetType()}
 	payload, err := json.Marshal(msg)
 	transportMessage.Payload = payload
 	if err != nil {
@@ -39,8 +39,8 @@ func (msg *InitMessage) Marshal() *TransportMessage {
 	return transportMessage
 }
 
-func (msg *InitMessage) GetSender() string {
-	return msg.Sender
+func (msg *InitMessage) GetSenderID() string {
+	return msg.SenderID
 }
 
 func (msg *InitMessage) GetType() Type {

@@ -17,15 +17,9 @@ type KeyPair struct {
 	Pk   kyber.Point
 }
 
-type KeyPairString struct {
-	Name string `json:"name"`
-	Sk   string `json:"sk"`
-	Pk   string `json:"pk"`
-}
-
 type Signature struct {
-	S  string `json:"s"`
-	Pk string `json:"pk"`
+	S        string `json:"s"`
+	SenderID string `json:"sender-id"`
 }
 
 func NewKeyPair(sk kyber.Scalar, pk kyber.Point) *KeyPair {
@@ -36,16 +30,15 @@ func NewKeyPair(sk kyber.Scalar, pk kyber.Point) *KeyPair {
 	}
 }
 
-func GenerateRandomKeypair() *KeyPair {
+func GenerateRandomKeypair() (*KeyPairString, error) {
 	suite := pairing.NewSuiteBn256()
 	sk, pk := bdn.NewKeyPair(suite, suite.RandomStream())
 
-	return NewKeyPair(sk, pk)
+	return NewKeyPair(sk, pk).Convert()
 }
 
 func (kp *KeyPair) Convert() (*KeyPairString, error) {
 	kpstr := &KeyPairString{}
-	kpstr.Name = xid.New().String()
 	skstr, pkstr, err := EncodeBdnToString(kp.Sk, kp.Pk)
 	if err != nil {
 		return nil, err
@@ -160,17 +153,13 @@ func ReadKeypairFile(f string) (*KeyPairString, error) {
 	//return kp, nil
 }
 
-func WriteKeypairFile(f string, kp *KeyPair) error {
+func WriteKeypairFile(f string, kp *KeyPairString) error {
 	keyFile, err := os.Create(f)
 	if err != nil {
 		return err
 	}
 
-	kpstr, err := kp.Convert()
-	if err != nil {
-		return err
-	}
-	data, err := json.Marshal(kpstr)
+	data, err := json.Marshal(kp)
 	if err != nil {
 		return err
 	}

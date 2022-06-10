@@ -1,6 +1,7 @@
 package carrier
 
 import (
+	"encoding/gob"
 	"github.com/OerllydSaethwr/carrier/pkg/util"
 	"github.com/rs/zerolog/log"
 	"net"
@@ -25,23 +26,40 @@ func (c *Carrier) handleIncomingConnections(l *net.TCPListener, handler func(con
 	}
 }
 
-func (c *Carrier) setupCarrierConnection(addressStr string) {
+func (n *Neighbour) connect(retryDelay time.Duration, maxRetry uint) {
 	// If carrierConnMaxRetry is 0, we keep retrying indefinitely
-	address, err := util.ResolveTCPAddr(addressStr)
+	address, err := util.ResolveTCPAddr(n.Address)
 	if err != nil {
 		log.Error().Msgf(err.Error())
 	}
-	for i := uint(0); c.conf.carrierConnMaxRetry == 0 || i < c.conf.carrierConnMaxRetry; i++ {
+	for i := uint(0); maxRetry == 0 || i < maxRetry; i++ {
 		conn, err := util.DialTCP(address)
-		if err == nil {
-			c.locks.CarrierConns.Lock()
-			c.carrierConns[addressStr] = conn
-			c.locks.CarrierConns.Unlock()
-			log.Info().Msgf("Connect to carrier %s | attempt %d/%d", address.String(), i+1, c.conf.carrierConnMaxRetry)
-			return
+		if err != nil {
+			log.Info().Msgf("failed to connect to carrier %s | attempt %d/%d", address.String(), i+1, maxRetry)
+			time.Sleep(retryDelay)
 		} else {
-			log.Info().Msgf("Failed to connect to carrier %s | attempt %d/%d", address.String(), i+1, c.conf.carrierConnMaxRetry)
-			time.Sleep(c.conf.carrierConnRetryDelay)
+			n.conn = conn
+			log.Info().Msgf("connect to carrier %s | attempt %d/%d", address.String(), i+1, maxRetry)
+
+			n.encoder = gob.NewEncoder(conn)
+			n.decoder = gob.NewDecoder(conn)
+
+			close(n.waitUntilAlive)
+
+			return
 		}
 	}
+}
+
+func (c *Carrier) checkAcceptedHashStoreAndDecide() {
+	c.locks.AcceptedHashStore.Lock()
+	defer c.locks.AcceptedHashStore.Unlock()
+
+	for _, v := range c.stores.acceptedHashStore {
+		if v == nil {
+			return
+		}
+	}
+
+	c.decide(c.stores.acceptedHashStore)
 }

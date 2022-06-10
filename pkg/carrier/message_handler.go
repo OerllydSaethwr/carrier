@@ -14,25 +14,25 @@ func (c *Carrier) handleInitMessage(rawMessage message.Message) error {
 	if !ok {
 		return fmt.Errorf("expected InitMessage")
 	}
-	//log.Info().Msgf("received InitMessage from %s", initM.GetSender())
+	//log.Info().Msgf("received InitMessage from %s", initM.GetSenderID())
 
 	h := initM.Hash()
 
 	s := util.Signature{
-		S:  c.Sign(h),
-		Pk: c.GetStringPK(),
+		S:        c.Sign(h),
+		SenderID: c.GetID(),
 	}
 
 	echoM := message.NewEchoMessage(
 		h,
 		s,
-		c.GetAddress(),
+		c.GetID(),
 	)
 
 	c.broadcast(echoM)
 
 	c.locks.ValueStore.Lock()
-	c.valueStore[h] = initM.V
+	c.stores.valueStore[h] = initM.V
 	c.locks.ValueStore.Unlock()
 
 	return nil
@@ -48,25 +48,27 @@ func (c *Carrier) handleEchoMessage(rawMessage message.Message) error {
 	err = c.Verify(echoM.H, echoM.S)
 	if err == nil {
 		c.locks.SignatureStore.Lock()
-		c.signatureStore[echoM.H] = append(c.signatureStore[echoM.H], echoM.S)
-		c.locks.SignatureStore.Unlock()
+		c.stores.signatureStore[echoM.H] = append(c.stores.signatureStore[echoM.H], echoM.S)
 
-		if len(c.signatureStore[echoM.H]) == c.f+1 {
+		// TODO potential deadlock
+		if len(c.stores.signatureStore[echoM.H]) == c.f+1 {
 			newSBSum := SuperBlockSummaryItem{
 				ID: xid.New().String(),
 				H:  echoM.H,
-				S:  c.signatureStore[echoM.H],
+				S:  c.stores.signatureStore[echoM.H], //TODO concurrent access here
 			}
 			c.locks.SuperBlockSummary.Lock()
-			c.superBlockSummary = append(c.superBlockSummary, newSBSum)
+			c.stores.superBlockSummary = append(c.stores.superBlockSummary, newSBSum)
 			c.locks.SuperBlockSummary.Unlock()
 		}
+
+		c.locks.SignatureStore.Unlock()
 	}
 
 	c.locks.SuperBlockSummary.Lock()
-	if len(c.superBlockSummary) == c.n-c.f {
-		err = c.NestedPropose(c.superBlockSummary)
-		c.superBlockSummary = make([]SuperBlockSummaryItem, 0)
+	if len(c.stores.superBlockSummary) == c.n-c.f {
+		err = c.NestedPropose(c.stores.superBlockSummary)
+		c.stores.superBlockSummary = make([]SuperBlockSummaryItem, 0)
 	}
 	c.locks.SuperBlockSummary.Unlock()
 	if err != nil {
@@ -84,12 +86,13 @@ func (c *Carrier) handleRequestMessage(rawMessage message.Message) error {
 
 	c.locks.ValueStore.Lock()
 	defer c.locks.ValueStore.Unlock()
-	if v, ok := c.valueStore[requestM.H]; ok {
+	if v, ok := c.stores.valueStore[requestM.H]; ok {
 		resolveM := message.NewResolveMessage(
 			requestM.H,
 			v,
 		)
-		c.marshalAndSend(requestM.GetSender(), resolveM)
+		dest := c.neighbours[requestM.GetSenderID()]
+		dest.marshalAndSend(resolveM)
 	}
 
 	return nil
@@ -105,14 +108,16 @@ func (c *Carrier) handleResolveMessage(rawMessage message.Message) error {
 	h := hex.EncodeToString(hb[:])
 	if resolveM.H == h {
 		c.locks.ValueStore.Lock()
-		c.valueStore[h] = resolveM.V
+		c.stores.valueStore[h] = resolveM.V
 		c.locks.ValueStore.Unlock()
 	}
 
-	//TODO add locks
-	if _, ok := c.acceptedHashStore[h]; ok {
-		c.acceptedHashStore[h] = resolveM.V
+	c.locks.AcceptedHashStore.Lock()
+	if _, ok := c.stores.acceptedHashStore[h]; ok {
+		c.stores.acceptedHashStore[h] = resolveM.V
+
 	}
+	c.locks.AcceptedHashStore.Unlock()
 
 	return nil
 }
@@ -130,11 +135,25 @@ outer:
 			}
 		}
 
-		if _, ok := c.valueStore[hs.H]; ok {
-			c.acceptedHashStore[hs.H] = c.valueStore[hs.H]
+		// This is ugly, but we need the locking to prevent concurrency bugs
+		// Lock
+		c.locks.AcceptedHashStore.Lock()
+		c.locks.ValueStore.Lock()
+		if _, ok := c.stores.valueStore[hs.H]; ok {
+			c.stores.acceptedHashStore[hs.H] = c.stores.valueStore[hs.H]
+
+			// Unlock
+			c.locks.ValueStore.Unlock()
+			c.locks.AcceptedHashStore.Unlock()
+
 		} else {
-			c.acceptedHashStore[hs.H] = nil
-			c.broadcast(message.NewRequestMessage(hs.H, c.GetAddress()))
+			c.stores.acceptedHashStore[hs.H] = nil
+
+			// Unlock
+			c.locks.ValueStore.Unlock()
+			c.locks.AcceptedHashStore.Unlock()
+
+			c.broadcast(message.NewRequestMessage(hs.H, c.GetID()))
 		}
 	}
 

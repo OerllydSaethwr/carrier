@@ -24,7 +24,7 @@ outerLoop:
 	for {
 		initMessage := message.NewInitMessage(
 			make([][]byte, 0),
-			c.GetAddress(),
+			c.GetID(),
 		)
 		for i := 0; i < util.MempoolThreshold; i++ {
 			buf := make([]byte, util.TsxSize) //TODO make this configurable
@@ -44,19 +44,20 @@ outerLoop:
 	if err2 != nil {
 		log.Error().Msgf(err2.Error())
 	}
-	log.Info().Msgf("Close client connection %s", conn.RemoteAddr())
+	log.Info().Msgf("close client connection %s", conn.RemoteAddr())
 }
 
 func (c *Carrier) handleCarrierConn(conn net.Conn) {
+
+	// Create a single decoder for a single incoming connection
+	decoder := gob.NewDecoder(conn)
 	for {
-		decoder := gob.NewDecoder(conn)
 		rawMessage := &message.TransportMessage{}
 		err := decoder.Decode(rawMessage)
 		if err != nil {
 			log.Error().Msgf(err.Error())
 			return
 		}
-		log.Info().Msgf("Received %s from %s", rawMessage.Type, conn.RemoteAddr())
 
 		var m message.Message
 		switch rawMessage.Type {
@@ -78,6 +79,7 @@ func (c *Carrier) handleCarrierConn(conn net.Conn) {
 			log.Error().Msgf(err.Error())
 		}
 
+		log.Info().Msgf("received %s from %s", m.GetType(), m.GetSenderID())
 		err = c.messageHandlers[rawMessage.Type](m)
 		if err != nil {
 			log.Error().Msgf(err.Error())

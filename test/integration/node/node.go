@@ -68,9 +68,15 @@ func setupDecisionConn(a string) *net.TCPConn {
 	if err != nil {
 		log.Error().Msgf(err.Error())
 	}
-	conn, err := net.DialTCP("tcp", nil, ar)
-	if err != nil {
-		log.Error().Msgf(err.Error())
+	var conn *net.TCPConn
+	for {
+		conn, err = net.DialTCP("tcp", nil, ar)
+		if err != nil {
+			log.Error().Msgf(err.Error())
+			time.Sleep(time.Second)
+		} else {
+			break
+		}
 	}
 
 	return conn

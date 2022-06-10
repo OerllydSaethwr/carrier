@@ -17,13 +17,13 @@ import (
 var keysCmd = &cobra.Command{
 	Use:   "keys",
 	Short: "Generate key pair for signing",
-	Long:  `Nil`,
+	Long:  `Pass an output file where the newly generated keypair will be printed`,
 	Args:  validateKeys,
-	RunE:  runKeys,
+	RunE:  runGenerateKeys,
 }
 
 func init() {
-	rootCmd.AddCommand(keysCmd)
+	generateCmd.AddCommand(keysCmd)
 
 	// Here you will define your flags and configuration settings.
 
@@ -50,7 +50,10 @@ func validateKeys(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func runKeys(cmd *cobra.Command, args []string) error {
-	kp := util.GenerateRandomKeypair()
+func runGenerateKeys(cmd *cobra.Command, args []string) error {
+	kp, err := util.GenerateRandomKeypair()
+	if err != nil {
+		return err
+	}
 	return util.WriteKeypairFile(args[0], kp)
 }

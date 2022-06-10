@@ -1,37 +1,32 @@
 package carrier
 
 import (
-	"encoding/gob"
 	"github.com/OerllydSaethwr/carrier/pkg/carrier/message"
 	"github.com/rs/zerolog/log"
 )
 
+// For communicating with carriers
 func (c *Carrier) broadcast(message message.Message) {
-	log.Info().Msgf("Broadcast %s", message.GetType())
+	log.Info().Msgf("broadcast %s", message.GetType())
 	transportMessage := message.Marshal()
 
-	for _, addr := range c.carriers {
-		c.send(addr, transportMessage)
+	for _, n := range c.neighbours {
+		n.send(transportMessage)
 	}
 }
 
-func (c *Carrier) send(dest string, message *message.TransportMessage) {
-	conn, ok := c.carrierConns[dest]
-	if !ok {
-		log.Error().Msgf("Cannot find connection to address %s", dest)
-		panic(1)
-		return
+func (n *Neighbour) send(message *message.TransportMessage) {
+	if !n.IsAlive() {
+		n.WaitUntilAlive()
 	}
 
-	encoder := gob.NewEncoder(conn)
-
 	// Send to dest
-	err := encoder.Encode(message)
+	err := n.GetEncoder().Encode(message)
 	if err != nil {
 		log.Error().Msgf(err.Error())
 	}
 }
 
-func (c *Carrier) marshalAndSend(dest string, message message.Message) {
-	c.send(dest, message.Marshal())
+func (n *Neighbour) marshalAndSend(message message.Message) {
+	n.send(message.Marshal())
 }

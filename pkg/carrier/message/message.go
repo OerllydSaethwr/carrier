@@ -22,6 +22,6 @@ type Message interface {
 	Payload() []byte
 	Hash() string
 	Marshal() *TransportMessage
-	GetSender() string
+	GetSenderID() string
 	GetType() Type
 }
