@@ -1,0 +1,15 @@
+{
+  "hosts": [
+    "h1",
+    "h2",
+    "h3"
+  ],
+  "fronts": [
+    "f1:p1",
+    "f2:p2",
+    "f3:p3"
+  ]
+}
+
+// hosts is a list of IPs carriers will run on
+// fronts is a list of front addresses in host:port format, where carriers will forward data to
