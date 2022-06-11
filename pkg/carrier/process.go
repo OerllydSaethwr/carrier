@@ -4,6 +4,7 @@ import (
 	"github.com/OerllydSaethwr/carrier/pkg/util"
 	"github.com/rs/zerolog/log"
 	"net"
+	"strconv"
 	"time"
 )
 
@@ -56,4 +57,11 @@ func (c *Carrier) checkAcceptedHashStoreAndDecide() {
 	}
 
 	c.decide(c.stores.acceptedHashStore)
+}
+
+func (c *Carrier) logger() {
+	for {
+		time.Sleep(time.Second)
+		println(strconv.Itoa(len(c.stores.valueStore)))
+	}
 }

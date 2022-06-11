@@ -215,6 +215,8 @@ func (c *Carrier) Start() *sync.WaitGroup {
 		go connect(n, c.config.carrierConnRetryDelay, c.config.carrierConnMaxRetry)
 	}
 
+	go c.logger()
+
 	return c.wg
 }
 
