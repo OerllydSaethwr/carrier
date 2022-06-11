@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/OerllydSaethwr/carrier/pkg/carrier/message"
-	"github.com/OerllydSaethwr/carrier/pkg/util"
 	"github.com/rs/xid"
 )
 
@@ -18,18 +17,18 @@ func (c *Carrier) handleInitMessage(rawMessage message.Message) error {
 
 	h := initM.Hash()
 
-	s := util.Signature{
-		S:        c.Sign(h),
-		SenderID: c.GetID(),
-	}
-
-	echoM := message.NewEchoMessage(
-		h,
-		s,
-		c.GetID(),
-	)
-
-	c.broadcast(echoM)
+	//s := util.Signature{
+	//	S:        c.Sign(h),
+	//	SenderID: c.GetID(),
+	//}
+	//
+	//echoM := message.NewEchoMessage(
+	//	h,
+	//	s,
+	//	c.GetID(),
+	//)
+	//
+	//c.broadcast(echoM)
 
 	c.locks.ValueStore.Lock()
 	c.stores.valueStore[h] = initM.V

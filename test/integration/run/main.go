@@ -94,7 +94,7 @@ func main() {
 			cmd := exec.Command("go", "run", integrationPath+"client/client.go", client[i])
 			cmd.Stdout = clientLog
 			cmd.Stderr = clientLog
-			//err = cmd.Start()
+			err = cmd.Start()
 			if err != nil {
 				log.Error().Msgf(err.Error())
 				return

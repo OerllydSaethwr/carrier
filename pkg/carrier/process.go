@@ -4,7 +4,6 @@ import (
 	"github.com/OerllydSaethwr/carrier/pkg/util"
 	"github.com/rs/zerolog/log"
 	"net"
-	"strconv"
 	"time"
 )
 
@@ -62,6 +61,12 @@ func (c *Carrier) checkAcceptedHashStoreAndDecide() {
 func (c *Carrier) logger() {
 	for {
 		time.Sleep(time.Second)
-		println(strconv.Itoa(len(c.stores.valueStore)))
+		println(c.counter)
+	}
+}
+
+func (c *Carrier) bufferMaker() {
+	for {
+		c.bufferDispenser <- make([]byte, util.TsxSize)
 	}
 }

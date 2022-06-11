@@ -22,7 +22,8 @@ outerLoop:
 			c.GetID(),
 		)
 		for i := 0; i < util.MempoolThreshold; i++ {
-			buf := make([]byte, util.TsxSize) //TODO make this configurable
+			//buf := make([]byte, util.TsxSize) //TODO make this configurable
+			buf := <-c.bufferDispenser
 			_, err := io.ReadAtLeast(conn, buf, util.TsxSize)
 			if err != nil {
 				log.Info().Msgf(err.Error())
@@ -37,6 +38,7 @@ outerLoop:
 		log.Debug().Msgf("P %d", len(c.stores.superBlockSummary))
 		log.Debug().Msgf("D %d", len(c.stores.acceptedHashStore))
 
+		c.counter++
 		c.broadcast(initMessage)
 	}
 

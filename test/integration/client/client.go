@@ -1,6 +1,8 @@
 package main
 
 import (
+	"github.com/OerllydSaethwr/carrier/pkg/util"
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"math/rand"
 	"net"
@@ -12,9 +14,12 @@ func main() {
 	var err error
 	var conn *net.TCPConn
 
-	transaction := make([]byte, 9)
+	transaction := make([]byte, util.TsxSize)
 	servAddr := os.Args[1]
-	rate := 5
+	var counter uint = 0
+	//rate := 10000
+
+	zerolog.SetGlobalLevel(zerolog.Disabled)
 
 	tcpAddr, err := net.ResolveTCPAddr("tcp", servAddr)
 	if err != nil {
@@ -32,6 +37,13 @@ func main() {
 	}
 	log.Info().Msgf("Connected")
 
+	go func() {
+		for {
+			time.Sleep(time.Second)
+			println(counter)
+		}
+	}()
+
 	for {
 		rand.Read(transaction)
 		_, err = conn.Write(transaction)
@@ -40,7 +52,8 @@ func main() {
 			os.Exit(1)
 		}
 		log.Info().Msgf("Send %d bytes to %s", len(transaction), servAddr)
-		time.Sleep(time.Duration(int64(time.Second) / int64(rate)))
+		counter++
+		//time.Sleep(time.Duration(int64(time.Second) / int64(rate)))
 	}
 
 	conn.Close()

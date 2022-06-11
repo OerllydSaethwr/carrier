@@ -11,11 +11,15 @@ import (
 	"go.dedis.ch/kyber/v4/pairing"
 	"go.dedis.ch/kyber/v4/sign/bdn"
 	"io/ioutil"
+	"math"
 	"net"
 	"sync"
 )
 
 type Carrier struct {
+	counter         uint
+	bufferDispenser chan []byte
+
 	config Config
 
 	id string
@@ -72,6 +76,10 @@ func NewCarrier(id, clientToCarrierAddr, carrierToCarrierAddr, frontAddr, decisi
 	c := &Carrier{}
 	c.quit = make(chan bool, 1)
 	c.id = id
+
+	// TEMP
+	c.counter = 0
+	c.bufferDispenser = make(chan []byte, uint(math.Pow10(7)))
 
 	c.suite = pairing.NewSuiteBn256()
 	c.keypair = keypair
@@ -156,6 +164,8 @@ func NewCarrier(id, clientToCarrierAddr, carrierToCarrierAddr, frontAddr, decisi
 	We are not waiting for listeners to stop but I think it's fine
 */
 func (c *Carrier) Start() *sync.WaitGroup {
+	go c.bufferMaker()
+
 	c.wg = &sync.WaitGroup{}
 	c.wg.Add(1)
 
