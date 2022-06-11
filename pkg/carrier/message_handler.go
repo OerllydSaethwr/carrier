@@ -50,7 +50,8 @@ func (c *Carrier) handleEchoMessage(rawMessage message.Message) error {
 		c.locks.SignatureStore.Lock()
 		c.stores.signatureStore[echoM.H] = append(c.stores.signatureStore[echoM.H], echoM.S)
 
-		// TODO potential deadlock
+		// TODO potential deadlock, but I think it's fine for now
+		// @Critical C2
 		if len(c.stores.signatureStore[echoM.H]) == c.f+1 {
 			newSBSum := SuperBlockSummaryItem{
 				ID: xid.New().String(),
@@ -119,10 +120,18 @@ func (c *Carrier) handleResolveMessage(rawMessage message.Message) error {
 	}
 	c.locks.AcceptedHashStore.Unlock()
 
+	c.checkAcceptedHashStoreAndDecide()
+
 	return nil
 }
 
 func (c *Carrier) handleNestedSMRDecision(N SuperBlockSummary) error {
+	// Adding a bottleneck here because of time constaints
+	// We should be able to process Nested SMR decisions concurrently
+	// This requires us to keep a separate instance of D for each decision we receive
+	// I didn't have time to implement this so I'm ensuring that we process each D sequentially
+
+	c.locks.DecisionLock.Lock()
 outer:
 	for _, hs := range N {
 		if len(hs.S) != c.f+1 {
@@ -156,6 +165,8 @@ outer:
 			c.broadcast(message.NewRequestMessage(hs.H, c.GetID()))
 		}
 	}
+
+	c.checkAcceptedHashStoreAndDecide()
 
 	return nil
 }

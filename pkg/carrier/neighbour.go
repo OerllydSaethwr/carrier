@@ -11,7 +11,6 @@ type Neighbour struct {
 	util.Neighbour
 	conn           *net.TCPConn
 	encoder        *gob.Encoder
-	decoder        *gob.Decoder
 	waitUntilAlive chan int // Dummy channel that we use to block other processes until the connection becomes live
 }
 
@@ -24,7 +23,6 @@ func NewNeighbour(id, address, pk string) *Neighbour {
 		},
 		conn:           nil,
 		encoder:        nil,
-		decoder:        nil,
 		waitUntilAlive: make(chan int),
 	}
 
@@ -43,17 +41,10 @@ func (n *Neighbour) GetPK() string {
 	return n.PK
 }
 
-func (n *Neighbour) GetConn() *net.TCPConn {
-	return n.conn
-}
-
-func (n *Neighbour) GetEncoder() *gob.Encoder {
+// GetEncoder will block until connection is alive
+func (n *Neighbour) GetEncoder() Encoder {
+	n.WaitUntilAlive()
 	return n.encoder
-}
-
-// @Unused
-func (n *Neighbour) GetDecoder() *gob.Decoder {
-	return n.decoder
 }
 
 func (n *Neighbour) IsAlive() bool {
@@ -61,7 +52,19 @@ func (n *Neighbour) IsAlive() bool {
 }
 
 func (n *Neighbour) WaitUntilAlive() {
-	log.Info().Msgf("waiting for connection with %s to come alive...", n.GetAddress())
-	<-n.waitUntilAlive
+	if !n.IsAlive() {
+		log.Info().Msgf("waiting for connection with %s to come alive...", n.GetAddress())
+		<-n.waitUntilAlive
+	}
 	return
+}
+
+func (n *Neighbour) SetConnAndEncoderAndSignalAlive(conn *net.TCPConn) {
+	n.conn = conn
+	n.encoder = gob.NewEncoder(conn)
+	close(n.waitUntilAlive)
+}
+
+func (n *Neighbour) GetType() string {
+	return "carrier"
 }

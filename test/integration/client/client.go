@@ -14,7 +14,7 @@ func main() {
 
 	transaction := make([]byte, 9)
 	servAddr := os.Args[1]
-	rate := 500
+	rate := 5
 
 	tcpAddr, err := net.ResolveTCPAddr("tcp", servAddr)
 	if err != nil {

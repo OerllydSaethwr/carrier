@@ -105,7 +105,7 @@ func DecodeStringToBdnSK(sk string) (kyber.Scalar, error) {
 	}
 
 	// This depends on the keys being generated on the G2 curve. Might be a good idea to parametrize this.
-	// CRITICAL C1
+	// @Critical C1
 	skk := pairing.NewSuiteBn256().G2().Scalar()
 	err = skk.UnmarshalBinary(skbuf)
 	if err != nil {
@@ -121,7 +121,7 @@ func DecodeStringToBdnPK(pk string) (kyber.Point, error) {
 		return nil, err
 	}
 
-	// CRITICAL C1
+	// @Critical C1
 	pkk := pairing.NewSuiteBn256().G2().Point()
 	err = pkk.UnmarshalBinary(pkbuf)
 	if err != nil {

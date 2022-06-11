@@ -16,9 +16,6 @@ func (c *Carrier) broadcast(message message.Message) {
 }
 
 func (n *Neighbour) send(message *message.TransportMessage) {
-	if !n.IsAlive() {
-		n.WaitUntilAlive()
-	}
 
 	// Send to dest
 	err := n.GetEncoder().Encode(message)

@@ -13,7 +13,6 @@ import (
 	"io/ioutil"
 	"net"
 	"sync"
-	"time"
 )
 
 type Carrier struct {
@@ -27,6 +26,7 @@ type Carrier struct {
 	addresses Addresses
 
 	nodeConn *net.TCPConn
+	node     *Node
 
 	neighbours map[string]*Neighbour
 
@@ -43,46 +43,6 @@ type Carrier struct {
 
 	quit chan bool
 }
-
-type Locks struct {
-	ValueStore        *sync.RWMutex
-	SignatureStore    *sync.RWMutex
-	SuperBlockSummary *sync.RWMutex
-	AcceptedHashStore *sync.RWMutex
-}
-
-type Stores struct {
-	valueStore        map[string][][]byte
-	signatureStore    map[string][]util.Signature
-	superBlockSummary []SuperBlockSummaryItem
-	acceptedHashStore map[string][][]byte
-}
-
-type Listeners struct {
-	clientListener   *net.TCPListener
-	carrierListener  *net.TCPListener
-	decisionListener *net.TCPListener
-}
-
-type Config struct {
-	carrierConnRetryDelay time.Duration
-	carrierConnMaxRetry   uint
-}
-
-type Addresses struct {
-	client2carrier  string
-	carrier2carrier string
-	front           string
-	decision        string
-}
-
-type SuperBlockSummaryItem struct {
-	ID string           `json:"ID"`
-	H  string           `json:"h"`
-	S  []util.Signature `json:"s"`
-}
-
-type SuperBlockSummary []SuperBlockSummaryItem
 
 func Load(file string) (*Carrier, error) {
 	// Read config file
@@ -116,6 +76,7 @@ func NewCarrier(id, clientToCarrierAddr, carrierToCarrierAddr, frontAddr, decisi
 	c.suite = pairing.NewSuiteBn256()
 	c.keypair = keypair
 
+	c.node = NewNode(frontAddr)
 	c.neighbours = carriers
 
 	c.f = (len(carriers) - 1) / 3
@@ -124,6 +85,8 @@ func NewCarrier(id, clientToCarrierAddr, carrierToCarrierAddr, frontAddr, decisi
 	c.config = Config{
 		carrierConnRetryDelay: util.CarrierConnRetryDelay,
 		carrierConnMaxRetry:   util.CarrierConnMaxRetry,
+		nodeConnRetryDelay:    util.NodeConnRetryDelay,
+		nodeConnMaxRetry:      util.NodeConnMaxRetry,
 	}
 
 	c.messageHandlers = map[message.Type]func(message.Message) error{
@@ -138,6 +101,7 @@ func NewCarrier(id, clientToCarrierAddr, carrierToCarrierAddr, frontAddr, decisi
 		SignatureStore:    &sync.RWMutex{},
 		SuperBlockSummary: &sync.RWMutex{},
 		AcceptedHashStore: &sync.RWMutex{},
+		DecisionLock:      &sync.RWMutex{},
 	}
 
 	c.stores = Stores{
@@ -150,7 +114,6 @@ func NewCarrier(id, clientToCarrierAddr, carrierToCarrierAddr, frontAddr, decisi
 	c.addresses = Addresses{
 		client2carrier:  clientToCarrierAddr,
 		carrier2carrier: carrierToCarrierAddr,
-		front:           frontAddr,
 		decision:        decisionAddr,
 	}
 
@@ -198,19 +161,6 @@ func (c *Carrier) Start() *sync.WaitGroup {
 
 	var err error
 
-	// Connect to node
-	front, err := util.ResolveTCPAddr(c.getFrontAddress())
-	if err != nil {
-		log.Error().Msgf(err.Error())
-		c.wg.Done()
-		return c.wg
-	}
-	c.nodeConn, err = util.DialTCP(front)
-	if err != nil {
-		log.Error().Msgf("failed to connect to node %s", err.Error())
-		// We will retry later
-	}
-
 	// Listen to nested SMR decisions
 	decision, err := util.ResolveTCPAddr(c.getDecisionAddress())
 	if err != nil {
@@ -257,9 +207,12 @@ func (c *Carrier) Start() *sync.WaitGroup {
 	log.Info().Msgf("start listening to neighbours on %s", c.getCarrierToCarrierAddress())
 	go c.handleIncomingConnections(c.listeners.carrierListener, c.handleCarrierConn)
 
+	//Connect to node
+	connect(c.node, c.config.nodeConnRetryDelay, c.config.nodeConnMaxRetry)
+
 	// Set up connections to other neighbours
 	for _, n := range c.neighbours {
-		go n.connect(c.config.carrierConnRetryDelay, c.config.carrierConnMaxRetry)
+		go connect(n, c.config.carrierConnRetryDelay, c.config.carrierConnMaxRetry)
 	}
 
 	return c.wg
@@ -279,38 +232,12 @@ func (c *Carrier) GetAddress() string {
 	return c.getCarrierToCarrierAddress()
 }
 
-// TODO make this a proper retrying function and gracefully fail if cannot be established
-func (c *Carrier) retryNodeConnection() {
-	var err error
-	front, err := util.ResolveTCPAddr(c.getFrontAddress())
-	if err != nil {
-		log.Error().Msgf(err.Error())
-		return
-	}
-
-	c.nodeConn, err = util.DialTCP(front)
-	if err != nil {
-		log.Error().Msgf(err.Error())
-	}
-	log.Info().Msgf("connect to node %s", c.getFrontAddress())
-}
-
 func (c *Carrier) NestedPropose(P SuperBlockSummary) error {
-	if c.nodeConn == nil {
-		c.retryNodeConnection()
-	}
 
-	encoder := json.NewEncoder(c.nodeConn)
-	err := encoder.Encode(P)
+	err := c.node.GetEncoder().Encode(P)
 	if err != nil {
 		return err
 	}
-	//
-	//encoder := gob.NewEncoder(c.nodeConn)
-	//err := encoder.Encode(P)
-	//if err != nil {
-	//	return err
-	//}
 
 	log.Info().Msgf("proposed unknown bytes of data to %s", c.getFrontAddress())
 	return nil
@@ -406,8 +333,11 @@ func (c *Carrier) GetSuite() pairing.Suite {
 	return c.suite.Suite
 }
 
-func (c *Carrier) decide(D map[string][][]byte) {
-
+func (c *Carrier) decide(oldD map[string][][]byte) {
+	defer c.locks.DecisionLock.Unlock()
+	D := oldD
+	c.stores.acceptedHashStore = map[string][][]byte{}
+	log.Info().Msgf("decided %s", D)
 }
 
 func (c *Carrier) getFrontAddress() string {

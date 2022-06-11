@@ -13,11 +13,6 @@ import (
 /* Functions in this file are typically invoked as their own goroutines and loop while the connection is open */
 
 func (c *Carrier) handleClientConn(conn net.Conn) {
-	// If we didn't manage to connect to the node before, try one last time
-	if c.nodeConn == nil {
-		c.retryNodeConnection()
-	}
-
 	// Make a buffer to hold incoming data.
 	// Read the incoming connection into the buffer.
 outerLoop:
@@ -36,6 +31,11 @@ outerLoop:
 
 			initMessage.V = append(initMessage.V, buf)
 		}
+
+		log.Debug().Msgf("V %d", len(c.stores.valueStore))
+		log.Debug().Msgf("S %d", len(c.stores.signatureStore))
+		log.Debug().Msgf("P %d", len(c.stores.superBlockSummary))
+		log.Debug().Msgf("D %d", len(c.stores.acceptedHashStore))
 
 		c.broadcast(initMessage)
 	}
