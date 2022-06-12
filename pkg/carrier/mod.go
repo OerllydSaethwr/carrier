@@ -44,8 +44,8 @@ type Carrier struct {
 
 	wg *sync.WaitGroup
 
-	quit          chan bool
-	initDispenser chan *message.InitMessage
+	quit               chan bool
+	broadcastDispenser chan message.Message
 }
 
 func Load(file string) (*Carrier, error) {
@@ -79,7 +79,7 @@ func NewCarrier(id, clientToCarrierAddr, carrierToCarrierAddr, frontAddr, decisi
 
 	// TEMP
 	c.counter = 0
-	c.initDispenser = make(chan *message.InitMessage, int64(math.Pow10(7)))
+	c.broadcastDispenser = make(chan message.Message, int64(math.Pow10(7)))
 
 	c.suite = pairing.NewSuiteBn256()
 	c.keypair = keypair
@@ -225,6 +225,7 @@ func (c *Carrier) Start() *sync.WaitGroup {
 
 	go c.logger()
 	c.launchWorkerPool(10, c.broadcastWorker)
+	//c.launchWorkerPool(10, c.receiveWorker)
 
 	return c.wg
 }

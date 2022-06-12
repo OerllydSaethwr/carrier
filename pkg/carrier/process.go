@@ -73,6 +73,12 @@ func (c *Carrier) launchWorkerPool(poolSize int, task func()) {
 
 func (c *Carrier) broadcastWorker() {
 	for {
-		c.broadcast(<-c.initDispenser)
+		c.executeBroadcast(<-c.broadcastDispenser)
 	}
 }
+
+//func (c *Carrier) receiveWorker() {
+//	for {
+//		c.receiveMessage()
+//	}
+//}

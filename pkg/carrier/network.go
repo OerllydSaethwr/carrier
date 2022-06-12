@@ -5,8 +5,12 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-// For communicating with carriers
 func (c *Carrier) broadcast(message message.Message) {
+	c.broadcastDispenser <- message
+}
+
+// For communicating with carriers
+func (c *Carrier) executeBroadcast(message message.Message) {
 	log.Info().Msgf("broadcast %s", message.GetType())
 	transportMessage := message.Marshal()
 

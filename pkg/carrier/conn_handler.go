@@ -40,8 +40,7 @@ outerLoop:
 		c.counter++
 
 		//TODO tomorrow broadcast slows down client to about 500,000 tsx, carrier to 200,000. definite bottleneck, check marshalling
-		//go c.broadcast(initMessage)
-		c.initDispenser <- initMessage
+		c.broadcast(initMessage)
 	}
 
 	err := conn.Close()
