@@ -17,8 +17,7 @@ import (
 )
 
 type Carrier struct {
-	counter         uint
-	bufferDispenser chan []byte
+	counter uint
 
 	config Config
 
@@ -45,7 +44,8 @@ type Carrier struct {
 
 	wg *sync.WaitGroup
 
-	quit chan bool
+	quit          chan bool
+	initDispenser chan *message.InitMessage
 }
 
 func Load(file string) (*Carrier, error) {
@@ -79,7 +79,7 @@ func NewCarrier(id, clientToCarrierAddr, carrierToCarrierAddr, frontAddr, decisi
 
 	// TEMP
 	c.counter = 0
-	c.bufferDispenser = make(chan []byte, uint(math.Pow10(7)))
+	c.initDispenser = make(chan *message.InitMessage, int64(math.Pow10(7)))
 
 	c.suite = pairing.NewSuiteBn256()
 	c.keypair = keypair
@@ -164,8 +164,6 @@ func NewCarrier(id, clientToCarrierAddr, carrierToCarrierAddr, frontAddr, decisi
 	We are not waiting for listeners to stop but I think it's fine
 */
 func (c *Carrier) Start() *sync.WaitGroup {
-	go c.bufferMaker()
-
 	c.wg = &sync.WaitGroup{}
 	c.wg.Add(1)
 
@@ -226,6 +224,7 @@ func (c *Carrier) Start() *sync.WaitGroup {
 	}
 
 	go c.logger()
+	c.launchWorkerPool(10, c.broadcastWorker)
 
 	return c.wg
 }

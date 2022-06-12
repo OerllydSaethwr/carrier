@@ -22,8 +22,7 @@ outerLoop:
 			c.GetID(),
 		)
 		for i := 0; i < util.MempoolThreshold; i++ {
-			//buf := make([]byte, util.TsxSize) //TODO make this configurable
-			buf := <-c.bufferDispenser
+			buf := make([]byte, util.TsxSize) //TODO make this configurable
 			_, err := io.ReadAtLeast(conn, buf, util.TsxSize)
 			if err != nil {
 				log.Info().Msgf(err.Error())
@@ -39,12 +38,15 @@ outerLoop:
 		log.Debug().Msgf("D %d", len(c.stores.acceptedHashStore))
 
 		c.counter++
-		c.broadcast(initMessage)
+
+		//TODO tomorrow broadcast slows down client to about 500,000 tsx, carrier to 200,000. definite bottleneck, check marshalling
+		//go c.broadcast(initMessage)
+		c.initDispenser <- initMessage
 	}
 
-	err2 := conn.Close()
-	if err2 != nil {
-		log.Error().Msgf(err2.Error())
+	err := conn.Close()
+	if err != nil {
+		log.Error().Msgf(err.Error())
 	}
 	log.Info().Msgf("close client connection %s", conn.RemoteAddr())
 }

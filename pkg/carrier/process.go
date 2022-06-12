@@ -65,8 +65,14 @@ func (c *Carrier) logger() {
 	}
 }
 
-func (c *Carrier) bufferMaker() {
+func (c *Carrier) launchWorkerPool(poolSize int, task func()) {
+	for i := 0; i < poolSize; i++ {
+		go task()
+	}
+}
+
+func (c *Carrier) broadcastWorker() {
 	for {
-		c.bufferDispenser <- make([]byte, util.TsxSize)
+		c.broadcast(<-c.initDispenser)
 	}
 }

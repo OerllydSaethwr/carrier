@@ -15,6 +15,7 @@ func (c *Carrier) broadcast(message message.Message) {
 	}
 }
 
+// @Bottleneck B1 - double marshalling (try using gob only)
 func (n *Neighbour) send(message *message.TransportMessage) {
 
 	// Send to dest
