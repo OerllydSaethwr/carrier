@@ -17,7 +17,7 @@ import (
 )
 
 type Carrier struct {
-	counter uint
+	counter uint64
 
 	config Config
 
@@ -244,6 +244,11 @@ func (c *Carrier) GetAddress() string {
 	return c.getCarrierToCarrierAddress()
 }
 
+// TODO
+// Rust node expects to receive uint32 to describe size of tsx
+// Implement this framing
+// Implement decoding
+// Implement reply
 func (c *Carrier) NestedPropose(P SuperBlockSummary) error {
 
 	err := c.node.GetEncoder().Encode(P)

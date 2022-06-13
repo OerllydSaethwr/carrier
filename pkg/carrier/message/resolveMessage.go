@@ -43,3 +43,11 @@ func (msg *ResolveMessage) GetSenderID() string {
 func (msg *ResolveMessage) GetType() Type {
 	return Resolve
 }
+
+func (msg *ResolveMessage) BinaryMarshal() []byte {
+	panic("not implemented")
+}
+
+func (msg *ResolveMessage) BinaryUnmarshal(buf []byte) {
+	panic("not implemented")
+}

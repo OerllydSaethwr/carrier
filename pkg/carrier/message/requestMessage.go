@@ -42,3 +42,11 @@ func (msg *RequestMessage) GetSenderID() string {
 func (msg *RequestMessage) GetType() Type {
 	return Request
 }
+
+func (msg *RequestMessage) BinaryMarshal() []byte {
+	panic("not implemented")
+}
+
+func (msg *RequestMessage) BinaryUnmarshal(buf []byte) {
+	panic("not implemented")
+}

@@ -61,7 +61,7 @@ func (c *Carrier) checkAcceptedHashStoreAndDecide() {
 func (c *Carrier) logger() {
 	for {
 		time.Sleep(time.Second)
-		println(c.counter)
+		println(len(c.stores.valueStore))
 	}
 }
 

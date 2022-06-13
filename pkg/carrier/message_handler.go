@@ -25,7 +25,6 @@ func (c *Carrier) handleInitMessage(rawMessage message.Message) error {
 	echoM := message.NewEchoMessage(
 		h,
 		s,
-		c.GetID(),
 	)
 
 	c.broadcast(echoM)

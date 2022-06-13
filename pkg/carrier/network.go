@@ -12,23 +12,39 @@ func (c *Carrier) broadcast(message message.Message) {
 // For communicating with carriers
 func (c *Carrier) executeBroadcast(message message.Message) {
 	log.Info().Msgf("broadcast %s", message.GetType())
-	transportMessage := message.Marshal()
+
+	buf := message.BinaryMarshal()
+
+	//println(len(buf))
+	//n0 := buf[8]
+	//n1 := util.UnmarshalUInt64(buf[9:17])
+	//n2 := util.UnmarshalUInt64(buf[17:])
+	//println(n0)
+	//println(n1)
+	//println(n2)
+	//transportMessage := message.Marshal()
 
 	for _, n := range c.neighbours {
-		n.send(transportMessage)
+		n.send(buf)
 	}
 }
 
 // @Bottleneck B1 - double marshalling (try using gob only)
-func (n *Neighbour) send(message *message.TransportMessage) {
+func (n *Neighbour) send(buf []byte) {
 
 	// Send to dest
-	err := n.GetEncoder().Encode(message)
+	//err := n.GetEncoder().Encode(message)
+	//if err != nil {
+	//	log.Error().Msgf(err.Error())
+	//}
+	n.GetConnLock().Lock()
+	defer n.GetConnLock().Unlock()
+	_, err := n.conn.Write(buf)
 	if err != nil {
 		log.Error().Msgf(err.Error())
 	}
 }
 
 func (n *Neighbour) marshalAndSend(message message.Message) {
-	n.send(message.Marshal())
+	//n.send(message.Marshal())
 }

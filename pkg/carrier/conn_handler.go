@@ -1,13 +1,13 @@
 package carrier
 
 import (
-	"encoding/gob"
 	"encoding/json"
 	"github.com/OerllydSaethwr/carrier/pkg/carrier/message"
 	"github.com/OerllydSaethwr/carrier/pkg/util"
 	"github.com/rs/zerolog/log"
 	"io"
 	"net"
+	"sync/atomic"
 )
 
 /* Functions in this file are typically invoked as their own goroutines and loop while the connection is open */
@@ -37,7 +37,7 @@ outerLoop:
 		log.Debug().Msgf("P %d", len(c.stores.superBlockSummary))
 		log.Debug().Msgf("D %d", len(c.stores.acceptedHashStore))
 
-		c.counter++
+		atomic.AddUint64(&c.counter, 1)
 
 		//TODO tomorrow broadcast slows down client to about 500,000 tsx, carrier to 200,000. definite bottleneck, check marshalling
 		c.broadcast(initMessage)
@@ -51,43 +51,39 @@ outerLoop:
 }
 
 func (c *Carrier) handleCarrierConn(conn net.Conn) {
-
 	// Create a single decoder for a single incoming connection
-	decoder := gob.NewDecoder(conn)
+	//decoder := gob.NewDecoder(conn)
 	for {
-		rawMessage := &message.TransportMessage{}
-		err := decoder.Decode(rawMessage)
+		//r := bufio.NewReader(conn)
+		//buf := make([]byte, 35)
+		//_, err := io.ReadFull(r, buf)
+		//if err != nil {
+		//	panic(err)
+		//}
+
+		//r := bufio.NewReader(conn)
+		buf := make([]byte, 8)
+		_, err := io.ReadFull(conn, buf)
 		if err != nil {
 			log.Error().Msgf(err.Error())
-			return
+			panic(err)
 		}
-
-		var m message.Message
-		switch rawMessage.Type {
-		case message.Init:
-			m = &message.InitMessage{}
-			err = json.Unmarshal(rawMessage.Payload, m)
-		case message.Echo:
-			m = &message.EchoMessage{}
-			err = json.Unmarshal(rawMessage.Payload, m)
-		case message.Request:
-			m = &message.RequestMessage{}
-			err = json.Unmarshal(rawMessage.Payload, m)
-		case message.Resolve:
-			m = &message.ResolveMessage{}
-			err = json.Unmarshal(rawMessage.Payload, m)
-		}
-
+		ls := util.UnmarshalUInt64(buf)
+		buf2 := make([]byte, ls)
+		_, err = io.ReadFull(conn, buf2)
 		if err != nil {
 			log.Error().Msgf(err.Error())
+			panic(err)
 		}
+		t, m := message.BinaryUnmarshal(buf2)
 
 		log.Info().Msgf("received %s from %s", m.GetType(), m.GetSenderID())
-		err = c.messageHandlers[rawMessage.Type](m)
+		err = c.messageHandlers[t](m)
 		if err != nil {
 			log.Error().Msgf(err.Error())
 			panic("message handler returned error")
 		}
+
 	}
 }
 

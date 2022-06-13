@@ -5,6 +5,7 @@ import (
 	"github.com/OerllydSaethwr/carrier/pkg/util"
 	"github.com/rs/zerolog/log"
 	"net"
+	"sync"
 )
 
 type Neighbour struct {
@@ -12,6 +13,7 @@ type Neighbour struct {
 	conn           *net.TCPConn
 	encoder        *gob.Encoder
 	waitUntilAlive chan int // Dummy channel that we use to block other processes until the connection becomes live
+	connLock       *sync.RWMutex
 }
 
 func NewNeighbour(id, address, pk string) *Neighbour {
@@ -24,6 +26,7 @@ func NewNeighbour(id, address, pk string) *Neighbour {
 		conn:           nil,
 		encoder:        nil,
 		waitUntilAlive: make(chan int),
+		connLock:       &sync.RWMutex{},
 	}
 
 	return n
@@ -67,4 +70,8 @@ func (n *Neighbour) SetConnAndEncoderAndSignalAlive(conn *net.TCPConn) {
 
 func (n *Neighbour) GetType() string {
 	return "carrier"
+}
+
+func (n *Neighbour) GetConnLock() *sync.RWMutex {
+	return n.connLock
 }
