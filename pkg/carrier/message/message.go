@@ -2,6 +2,7 @@ package message
 
 import (
 	"encoding/json"
+	"github.com/OerllydSaethwr/carrier/pkg/util"
 )
 
 type Type string
@@ -40,4 +41,40 @@ func BinaryUnmarshal(buf []byte) (Type, Message) {
 	msg.BinaryUnmarshal(buf[1:])
 
 	return t, msg
+}
+
+func BinaryMarshalSenderID(SenderID string) ([]byte, []byte) {
+	// 2. Put size of SenderID as 8 bytes - uint64
+	senderIDb := []byte(SenderID)
+	senderIDsize := util.MarshalUInt64(uint64(len(senderIDb)))
+	return senderIDsize, senderIDb
+}
+
+func BinaryMarshalH(H string) ([]byte, []byte) {
+	// 3. Put size of H as 8 bytes - uint64
+	Hb := []byte(H)
+	Hsize := util.MarshalUInt64(uint64(len(Hb)))
+	return Hsize, Hb
+}
+
+func BinaryMarshalS(S string) ([]byte, []byte) {
+	// 3. Put size of H as 8 bytes - uint64
+	Sb := []byte(S)
+	Ssize := util.MarshalUInt64(uint64(len(Sb)))
+	return Ssize, Sb
+}
+
+func BinaryMarshalV(V [][]byte) ([]byte, []byte) {
+	var lenSumCounter int
+	for _, e := range V {
+		lenSumCounter += len(e)
+	}
+	lenSum := util.MarshalUInt64(uint64(lenSumCounter))
+
+	buf := make([]byte, 0)
+	for _, e := range V {
+		buf = append(buf, e...)
+	}
+
+	return lenSum, buf
 }

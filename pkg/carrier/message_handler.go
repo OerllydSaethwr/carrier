@@ -89,6 +89,7 @@ func (c *Carrier) handleRequestMessage(rawMessage message.Message) error {
 		resolveM := message.NewResolveMessage(
 			requestM.H,
 			v,
+			c.GetID(),
 		)
 		dest := c.neighbours[requestM.GetSenderID()]
 		dest.marshalAndSend(resolveM)

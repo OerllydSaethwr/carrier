@@ -52,16 +52,16 @@ func (msg *InitMessage) GetType() Type {
 // TotalSize - Type - IDSize - DataSize - ID - Data
 //         8 -    1 -      8 -        8 -  IDSize - DataSize
 func (msg *InitMessage) BinaryMarshal() []byte {
-	buf2 := make([]byte, 0)
+	buf := make([]byte, 0)
 
 	// 1. Put message type as a single byte. InitMessage has type 0
-	buf2 = append(buf2, byte(0))
+	buf = append(buf, byte(0))
 
 	// 2. Put size of SenderID as 8 bytes - uint64
 	senderIDb := []byte(msg.SenderID)
 	senderIDsize := util.MarshalUInt64(uint64(len(senderIDb)))
 	//println("i " + strconv.Itoa(len(senderIDb)))
-	buf2 = append(buf2, senderIDsize...)
+	buf = append(buf, senderIDsize...)
 
 	// 3. Put size of V as 8 bytes - uint64
 	var lenSumCounter int
@@ -70,24 +70,17 @@ func (msg *InitMessage) BinaryMarshal() []byte {
 	}
 	lenSum := util.MarshalUInt64(uint64(lenSumCounter))
 	//println("i " + strconv.Itoa(lenSumCounter))
-	buf2 = append(buf2, lenSum...)
+	buf = append(buf, lenSum...)
 
 	// 4. Put byte representation of SenderID
-	buf2 = append(buf2, senderIDb...)
+	buf = append(buf, senderIDb...)
 
 	// 5. Put flattened byte array of V
 	// Tsx is currently fixed so each element of V should have the same size. This will be crucial when decoding the struct.
 	// @Critical C3 - if you change this condition, marshalling-unmarshalling will break
 	for _, e := range msg.V {
-		buf2 = append(buf2, e...)
+		buf = append(buf, e...)
 	}
-
-	// 0. Calculate the size of the whole struct, encode it as 8 bytes - uint64 and put it at the beginning of the whole buffer
-	buf := make([]byte, 0)
-	lenBuf2 := uint64(len(buf2))
-	//println("i " + strconv.Itoa(int(lenBuf2)))
-	buf = append(buf, util.MarshalUInt64(lenBuf2)...)
-	buf = append(buf, buf2...)
 
 	return buf
 }

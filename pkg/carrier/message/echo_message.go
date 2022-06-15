@@ -47,41 +47,35 @@ func (msg *EchoMessage) GetType() Type {
 }
 
 func (msg *EchoMessage) BinaryMarshal() []byte {
-	buf2 := make([]byte, 0)
+	buf := make([]byte, 0)
 
-	// 1. Put message type as a single byte. InitMessage has type 0
-	buf2 = append(buf2, byte(1))
+	// 1. Put message type as a single byte. EchoMessage has type 1
+	buf = append(buf, byte(1))
 
 	// 2. Put size of SenderID as 8 bytes - uint64
 	senderIDb := []byte(msg.S.SenderID)
 	senderIDsize := util.MarshalUInt64(uint64(len(senderIDb)))
 	//println("i " + strconv.Itoa(len(senderIDb)))
-	buf2 = append(buf2, senderIDsize...)
+	buf = append(buf, senderIDsize...)
 
 	// 3. Put size of H as 8 bytes - uint64
 	Hb := []byte(msg.H)
 	Hsize := util.MarshalUInt64(uint64(len(Hb)))
-	buf2 = append(buf2, Hsize...)
+	buf = append(buf, Hsize...)
 
 	// 4. Put size of S as 8 bytes - uint64
 	Sb := []byte(msg.S.S)
 	Ssize := util.MarshalUInt64(uint64(len(Sb)))
-	buf2 = append(buf2, Ssize...)
+	buf = append(buf, Ssize...)
 
 	// 5. Put byte representation of SenderID
-	buf2 = append(buf2, senderIDb...)
+	buf = append(buf, senderIDb...)
 
 	// 6. Put byte representation of H
-	buf2 = append(buf2, Hb...)
+	buf = append(buf, Hb...)
 
 	// 7. Put byte representation of S
-	buf2 = append(buf2, Sb...)
-
-	// 0. Calculate the size of the whole struct, encode it as 8 bytes - uint64 and put it at the beginning of the whole buffer
-	buf := make([]byte, 0)
-	lenBuf2 := uint64(len(buf2))
-	buf = append(buf, util.MarshalUInt64(lenBuf2)...)
-	buf = append(buf, buf2...)
+	buf = append(buf, Sb...)
 
 	return buf
 }
@@ -104,7 +98,7 @@ func (msg *EchoMessage) BinaryUnmarshal(buf []byte) {
 	Hb := buf[24+senderIDsize : 24+senderIDsize+Hsize]
 	msg.H = string(Hb)
 
-	// 7. Decode H - Ssize bytes
+	// 7. Decode S - Ssize bytes
 	Sb := buf[24+senderIDsize+Hsize : 24+senderIDsize+Hsize+Ssize]
 	msg.S.S = string(Sb)
 }
