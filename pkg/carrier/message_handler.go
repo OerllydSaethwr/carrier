@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/OerllydSaethwr/carrier/pkg/carrier/message"
 	"github.com/OerllydSaethwr/carrier/pkg/util"
-	"github.com/rs/xid"
 )
 
 func (c *Carrier) handleInitMessage(rawMessage message.Message) error {
@@ -51,13 +50,8 @@ func (c *Carrier) handleEchoMessage(rawMessage message.Message) error {
 		// TODO potential deadlock, but I think it's fine for now
 		// @Critical C2
 		if len(c.stores.signatureStore[echoM.H]) == c.f+1 {
-			newSBSum := SuperBlockSummaryItem{
-				ID: xid.New().String(),
-				H:  echoM.H,
-				S:  c.stores.signatureStore[echoM.H], //TODO concurrent access here
-			}
 			c.locks.SuperBlockSummary.Lock()
-			c.stores.superBlockSummary = append(c.stores.superBlockSummary, newSBSum)
+			c.stores.superBlockSummary[echoM.H] = c.stores.signatureStore[echoM.H]
 			c.locks.SuperBlockSummary.Unlock()
 		}
 
@@ -67,7 +61,7 @@ func (c *Carrier) handleEchoMessage(rawMessage message.Message) error {
 	c.locks.SuperBlockSummary.Lock()
 	if len(c.stores.superBlockSummary) == c.n-c.f {
 		err = c.NestedPropose(c.stores.superBlockSummary)
-		c.stores.superBlockSummary = make([]SuperBlockSummaryItem, 0)
+		c.stores.superBlockSummary = map[string][]util.Signature{}
 	}
 	c.locks.SuperBlockSummary.Unlock()
 	if err != nil {
@@ -132,12 +126,12 @@ func (c *Carrier) handleNestedSMRDecision(N SuperBlockSummary) error {
 
 	c.locks.DecisionLock.Lock()
 outer:
-	for _, hs := range N {
-		if len(hs.S) != c.f+1 {
+	for h, S := range N {
+		if len(S) != c.f+1 {
 			continue outer
 		}
-		for _, s := range hs.S {
-			err := c.Verify(hs.H, s)
+		for _, s := range S {
+			err := c.Verify(h, s)
 			if err != nil {
 				continue outer
 			}
@@ -147,21 +141,21 @@ outer:
 		// Lock
 		c.locks.AcceptedHashStore.Lock()
 		c.locks.ValueStore.Lock()
-		if _, ok := c.stores.valueStore[hs.H]; ok {
-			c.stores.acceptedHashStore[hs.H] = c.stores.valueStore[hs.H]
+		if _, ok := c.stores.valueStore[h]; ok {
+			c.stores.acceptedHashStore[h] = c.stores.valueStore[h]
 
 			// Unlock
 			c.locks.ValueStore.Unlock()
 			c.locks.AcceptedHashStore.Unlock()
 
 		} else {
-			c.stores.acceptedHashStore[hs.H] = nil
+			c.stores.acceptedHashStore[h] = nil
 
 			// Unlock
 			c.locks.ValueStore.Unlock()
 			c.locks.AcceptedHashStore.Unlock()
 
-			c.broadcast(message.NewRequestMessage(hs.H, c.GetID()))
+			c.broadcast(message.NewRequestMessage(h, c.GetID()))
 		}
 	}
 

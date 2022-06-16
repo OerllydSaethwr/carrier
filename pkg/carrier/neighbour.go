@@ -1,7 +1,6 @@
 package carrier
 
 import (
-	"encoding/gob"
 	"github.com/OerllydSaethwr/carrier/pkg/util"
 	"github.com/rs/zerolog/log"
 	"net"
@@ -10,8 +9,7 @@ import (
 
 type Neighbour struct {
 	util.Neighbour
-	conn           *net.TCPConn
-	encoder        *gob.Encoder
+	encoder        *BinaryEncoder
 	waitUntilAlive chan int // Dummy channel that we use to block other processes until the connection becomes live
 	connLock       *sync.RWMutex
 }
@@ -23,8 +21,7 @@ func NewNeighbour(id, address, pk string) *Neighbour {
 			Address: address,
 			PK:      pk,
 		},
-		conn:           nil,
-		encoder:        nil,
+		encoder:        NewBinaryEncoder(nil),
 		waitUntilAlive: make(chan int),
 		connLock:       &sync.RWMutex{},
 	}
@@ -51,20 +48,19 @@ func (n *Neighbour) GetEncoder() Encoder {
 }
 
 func (n *Neighbour) IsAlive() bool {
-	return n.conn != nil
+	return n.encoder.conn != nil
 }
 
 func (n *Neighbour) WaitUntilAlive() {
 	if !n.IsAlive() {
-		log.Info().Msgf("waiting for connection with %s to come alive...", n.GetAddress())
+		log.Info().Msgf("waiting for connection with %s (carrier) to come alive...", n.GetAddress())
 		<-n.waitUntilAlive
 	}
 	return
 }
 
 func (n *Neighbour) SetConnAndEncoderAndSignalAlive(conn *net.TCPConn) {
-	n.conn = conn
-	n.encoder = gob.NewEncoder(conn)
+	n.encoder = NewBinaryEncoder(conn)
 	close(n.waitUntilAlive)
 }
 

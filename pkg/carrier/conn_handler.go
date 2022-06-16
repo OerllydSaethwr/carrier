@@ -1,7 +1,6 @@
 package carrier
 
 import (
-	"encoding/json"
 	"github.com/OerllydSaethwr/carrier/pkg/carrier/message"
 	"github.com/OerllydSaethwr/carrier/pkg/util"
 	"github.com/rs/zerolog/log"
@@ -51,34 +50,17 @@ outerLoop:
 }
 
 func (c *Carrier) handleCarrierConn(conn net.Conn) {
-	// Create a single decoder for a single incoming connection
-	//decoder := gob.NewDecoder(conn)
+	decoder := NewBinaryDecoder(conn)
 	for {
-		//r := bufio.NewReader(conn)
-		//buf := make([]byte, 35)
-		//_, err := io.ReadFull(r, buf)
-		//if err != nil {
-		//	panic(err)
-		//}
 
-		//r := bufio.NewReader(conn)
-		buf := make([]byte, 8)
-		_, err := io.ReadFull(conn, buf)
-		if err != nil {
-			log.Error().Msgf(err.Error())
-			panic(err)
-		}
-		ls := util.UnmarshalUInt64(buf)
-		buf2 := make([]byte, ls)
-		_, err = io.ReadFull(conn, buf2)
-		if err != nil {
-			log.Error().Msgf(err.Error())
-			panic(err)
-		}
-		t, m := message.BinaryUnmarshal(buf2)
+		// We expect packets framed using util.Frame - they will contain a uint32 (4 bytes) describing the length of the incoming stream
+		var m message.Message
+		err := decoder.Decode(&m)
 
 		log.Info().Msgf("received %s from %s", m.GetType(), m.GetSenderID())
-		err = c.messageHandlers[t](m)
+
+		// Send to message handler
+		err = c.messageHandlers[m.GetType()](m)
 		if err != nil {
 			log.Error().Msgf(err.Error())
 			panic("message handler returned error")
@@ -88,7 +70,7 @@ func (c *Carrier) handleCarrierConn(conn net.Conn) {
 }
 
 func (c *Carrier) decodeNestedSMRDecisions(conn net.Conn) {
-	decoder := json.NewDecoder(conn)
+	decoder := NewBinaryDecoder(conn)
 	for {
 		var superBlockSummary SuperBlockSummary
 		err := decoder.Decode(&superBlockSummary)

@@ -19,6 +19,18 @@ func UnmarshalUInt64(buf []byte) uint64 {
 	return binary.LittleEndian.Uint64(buf)
 }
 
+// MarshalUInt32 returns a byte array of length 8 in little-endian encoding
+func MarshalUInt32(n uint32) []byte {
+	buf := make([]byte, 4)
+	binary.LittleEndian.PutUint32(buf, n)
+
+	return buf
+}
+
+func UnmarshalUInt32(buf []byte) uint32 {
+	return binary.LittleEndian.Uint32(buf)
+}
+
 func Build(Vb []byte) [][]byte {
 	V := make([][]byte, len(Vb)/TsxSize)
 	for i := 0; i < len(Vb); i += TsxSize {
@@ -31,8 +43,8 @@ func Build(Vb []byte) [][]byte {
 func Frame(buf []byte) []byte {
 	// 0. Calculate the size of the whole struct, encode it as 8 bytes - uint64 and put it at the beginning of the whole buffer
 	framedBuf := make([]byte, 0)
-	lenBuf2 := uint64(len(buf))
-	framedBuf = append(framedBuf, MarshalUInt64(lenBuf2)...)
+	lenBuf2 := uint32(len(buf))
+	framedBuf = append(framedBuf, MarshalUInt32(lenBuf2)...)
 	framedBuf = append(framedBuf, buf...)
 
 	return framedBuf

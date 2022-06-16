@@ -115,7 +115,7 @@ func NewCarrier(id, clientToCarrierAddr, carrierToCarrierAddr, frontAddr, decisi
 	c.stores = Stores{
 		valueStore:        map[string][][]byte{},
 		signatureStore:    map[string][]util.Signature{},
-		superBlockSummary: make([]SuperBlockSummaryItem, 0),
+		superBlockSummary: map[string][]util.Signature{},
 		acceptedHashStore: map[string][][]byte{},
 	}
 
@@ -251,12 +251,12 @@ func (c *Carrier) GetAddress() string {
 // Implement reply
 func (c *Carrier) NestedPropose(P SuperBlockSummary) error {
 
-	err := c.node.GetEncoder().Encode(P)
+	err := c.node.GetEncoder().Encode(&P)
 	if err != nil {
 		return err
 	}
 
-	log.Info().Msgf("proposed unknown bytes of data to %s", c.getFrontAddress())
+	log.Info().Msgf("proposed unknown bytes of data to %s", c.node.GetAddress())
 	return nil
 }
 
@@ -355,10 +355,6 @@ func (c *Carrier) decide(oldD map[string][][]byte) {
 	D := oldD
 	c.stores.acceptedHashStore = map[string][][]byte{}
 	log.Info().Msgf("decided %s", D)
-}
-
-func (c *Carrier) getFrontAddress() string {
-	return c.addresses.front
 }
 
 func (c *Carrier) getClientToCarrierAddress() string {

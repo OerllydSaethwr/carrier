@@ -1,22 +1,20 @@
 package carrier
 
 import (
-	"encoding/json"
 	"github.com/rs/zerolog/log"
 	"net"
 )
 
 type Node struct {
 	address        string
-	conn           *net.TCPConn
-	encoder        *json.Encoder
+	encoder        *BinaryEncoder
 	waitUntilAlive chan int
 }
 
 func NewNode(address string) *Node {
 	return &Node{
 		address:        address,
-		conn:           nil,
+		encoder:        NewBinaryEncoder(nil),
 		waitUntilAlive: make(chan int),
 	}
 }
@@ -32,20 +30,19 @@ func (n *Node) GetEncoder() Encoder {
 }
 
 func (n *Node) IsAlive() bool {
-	return n.conn != nil
+	return n.encoder.conn != nil
 }
 
 func (n *Node) WaitUntilAlive() {
 	if !n.IsAlive() {
-		log.Info().Msgf("waiting for connection with %s to come alive...", n.GetAddress())
+		log.Info().Msgf("waiting for connection with %s (node) to come alive...", n.GetAddress())
 		<-n.waitUntilAlive
 	}
 	return
 }
 
 func (n *Node) SetConnAndEncoderAndSignalAlive(conn *net.TCPConn) {
-	n.conn = conn
-	n.encoder = json.NewEncoder(conn)
+	n.encoder = NewBinaryEncoder(conn)
 	close(n.waitUntilAlive)
 }
 

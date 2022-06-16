@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"github.com/OerllydSaethwr/carrier/pkg/carrier"
 	"github.com/rs/zerolog/log"
 	"net"
@@ -43,10 +42,10 @@ func main() {
 // Handles incoming requests.
 func handleRequest(conn net.Conn, da string) {
 	var superBlockSummary carrier.SuperBlockSummary
-	decoder := json.NewDecoder(conn)
+	decoder := carrier.NewBinaryDecoder(conn)
 
 	decision := setupDecisionConn(da)
-	encoder := json.NewEncoder(decision)
+	encoder := carrier.NewBinaryEncoder(decision)
 	for {
 		err := decoder.Decode(&superBlockSummary)
 		if err != nil {

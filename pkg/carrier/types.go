@@ -20,7 +20,7 @@ type Locks struct {
 type Stores struct {
 	valueStore        map[string][][]byte
 	signatureStore    map[string][]util.Signature
-	superBlockSummary []SuperBlockSummaryItem
+	superBlockSummary map[string][]util.Signature
 	acceptedHashStore map[string][][]byte
 }
 
@@ -40,7 +40,6 @@ type Config struct {
 type Addresses struct {
 	client2carrier  string
 	carrier2carrier string
-	front           string
 	decision        string
 }
 
@@ -50,7 +49,7 @@ type SuperBlockSummaryItem struct {
 	S  []util.Signature `json:"s"`
 }
 
-type SuperBlockSummary []SuperBlockSummaryItem
+type SuperBlockSummary map[string][]util.Signature
 
 type Remote interface {
 	GetAddress() string

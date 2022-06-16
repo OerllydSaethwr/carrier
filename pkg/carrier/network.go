@@ -14,7 +14,7 @@ func (c *Carrier) broadcast(message message.Message) {
 func (c *Carrier) executeBroadcast(message message.Message) {
 	log.Info().Msgf("broadcast %s", message.GetType())
 
-	framedBuf := util.Frame(message.BinaryMarshal())
+	buf := message.BinaryMarshal()
 
 	//println(len(buf))
 	//n0 := buf[8]
@@ -26,7 +26,7 @@ func (c *Carrier) executeBroadcast(message message.Message) {
 	//transportMessage := message.Marshal()
 
 	for _, n := range c.neighbours {
-		n.send(framedBuf)
+		n.send(buf)
 	}
 }
 
@@ -34,14 +34,9 @@ func (c *Carrier) executeBroadcast(message message.Message) {
 // DO NOT USE - send expects a framedBuf, it will not do the framing. Use framedAndSend instead
 func (n *Neighbour) send(buf []byte) {
 
+	// TODO figure something out with this
 	// Send to dest
-	//err := n.GetEncoder().Encode(message)
-	//if err != nil {
-	//	log.Error().Msgf(err.Error())
-	//}
-	n.GetConnLock().Lock()
-	defer n.GetConnLock().Unlock()
-	_, err := n.conn.Write(buf)
+	err := n.GetEncoder().Encode(buf)
 	if err != nil {
 		log.Error().Msgf(err.Error())
 	}
