@@ -10,7 +10,12 @@ const (
 	NodeConnRetryDelay    = time.Second // Delay between retries
 	NodeConnMaxRetry      = 10          // Number of max retries
 	MempoolThreshold      = 10          // Threshold in number of transactions before we initiate a consensus with carriers //TODO carriers can't keep up with batch rate lower than 10 and data will get garbled
-	BasePort              = 6000        // Used by the config generator for the base port
-	PortsPerCarrier       = 3           // Used by the config generator to know how many ports to reserve for each carrier
-	FrontPort             = 9000        // Base front port for nodes
+
+	BasePort        = 6000 // Used by the config generator for the base port
+	PortsPerCarrier = 3    // Used by the config generator to know how many ports to reserve for each carrier
+	FrontPort       = 9000 // Base front port for nodes
+
+	Decision = 3000 // Addresses used by the remote benchmarks. Make sure these are the same as in the settings.json
+	Client   = 5000
+	Carrier  = 4000
 )

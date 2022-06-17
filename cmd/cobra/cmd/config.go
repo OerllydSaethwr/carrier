@@ -78,10 +78,14 @@ func runGenerateConfig(cmd *cobra.Command, args []string) error {
 		shift := 0
 		if isLocalHost(host) {
 			shift = i * portsPerCarrier
+			config.Addresses.Decision = host + colon + strconv.Itoa(basePort+1+shift)
+			config.Addresses.Client = host + colon + strconv.Itoa(basePort+2+shift)
+			config.Addresses.Carrier = host + colon + strconv.Itoa(basePort+3+shift)
+		} else {
+			config.Addresses.Decision = host + colon + strconv.Itoa(util.Decision)
+			config.Addresses.Carrier = host + colon + strconv.Itoa(util.Carrier)
+			config.Addresses.Client = host + colon + strconv.Itoa(util.Client)
 		}
-		config.Addresses.Decision = host + colon + strconv.Itoa(basePort+1+shift)
-		config.Addresses.Client = host + colon + strconv.Itoa(basePort+2+shift)
-		config.Addresses.Carrier = host + colon + strconv.Itoa(basePort+3+shift)
 
 		kp, err := util.GenerateRandomKeypair()
 		if err != nil {
