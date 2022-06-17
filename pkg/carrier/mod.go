@@ -173,6 +173,7 @@ func (c *Carrier) Start() *sync.WaitGroup {
 
 	// Listen to nested SMR decisions
 	decision, err := util.ResolveTCPAddr(c.getDecisionAddress())
+	decision.IP = net.ParseIP("0.0.0.0") // We can only host on localhost
 	if err != nil {
 		log.Error().Msgf(err.Error())
 		c.wg.Done()
@@ -189,6 +190,7 @@ func (c *Carrier) Start() *sync.WaitGroup {
 
 	// Start client listener
 	client, err := util.ResolveTCPAddr(c.getClientToCarrierAddress())
+	client.IP = net.ParseIP("0.0.0.0")
 	if err != nil {
 		log.Error().Msgf(err.Error())
 		c.wg.Done()
@@ -205,6 +207,7 @@ func (c *Carrier) Start() *sync.WaitGroup {
 
 	// Start carrier listener
 	carrier, err := util.ResolveTCPAddr(c.getCarrierToCarrierAddress())
+	carrier.IP = net.ParseIP("0.0.0.0")
 	if err != nil {
 		log.Error().Msgf(err.Error())
 		c.wg.Done()
@@ -245,11 +248,6 @@ func (c *Carrier) GetAddress() string {
 	return c.getCarrierToCarrierAddress()
 }
 
-// TODO
-// Rust node expects to receive uint32 to describe size of tsx
-// Implement this framing
-// Implement decoding
-// Implement reply
 func (c *Carrier) NestedPropose(P SuperBlockSummary) error {
 
 	err := c.node.GetEncoder().Encode(&P)
