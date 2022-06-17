@@ -17,7 +17,7 @@ func main() {
 	transaction := make([]byte, util.TsxSize)
 	servAddr := os.Args[1]
 	var counter uint = 0
-	//rate := 5
+	rate := 20
 
 	zerolog.SetGlobalLevel(zerolog.Disabled)
 
@@ -53,7 +53,7 @@ func main() {
 		}
 		log.Info().Msgf("Send %d bytes to %s", len(transaction), servAddr)
 		counter++
-		//time.Sleep(time.Duration(int64(time.Second) / int64(rate)))
+		time.Sleep(time.Duration(int64(time.Second) / int64(rate)))
 	}
 
 	conn.Close()

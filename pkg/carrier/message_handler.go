@@ -62,6 +62,7 @@ func (c *Carrier) handleEchoMessage(rawMessage message.Message) error {
 	if len(c.stores.superBlockSummary) == c.n-c.f {
 		err = c.NestedPropose(c.stores.superBlockSummary)
 		c.stores.superBlockSummary = map[string][]util.Signature{}
+		c.sbsCounter++ // Advance superblockcounter
 	}
 	c.locks.SuperBlockSummary.Unlock()
 	if err != nil {

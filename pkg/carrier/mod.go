@@ -46,6 +46,7 @@ type Carrier struct {
 
 	quit               chan bool
 	broadcastDispenser chan message.Message
+	sbsCounter         int
 }
 
 func Load(file string) (*Carrier, error) {
@@ -80,6 +81,7 @@ func NewCarrier(id, clientToCarrierAddr, carrierToCarrierAddr, frontAddr, decisi
 	// TEMP
 	c.counter = 0
 	c.broadcastDispenser = make(chan message.Message, int64(math.Pow10(7)))
+	c.sbsCounter = 0
 
 	c.suite = pairing.NewSuiteBn256()
 	c.keypair = keypair
@@ -255,7 +257,7 @@ func (c *Carrier) NestedPropose(P SuperBlockSummary) error {
 		return err
 	}
 
-	log.Info().Msgf("proposed %s to %s", P, c.node.GetAddress())
+	log.Info().Msgf("proposed SuperBlock %d to %s", c.sbsCounter, c.node.GetAddress())
 	return nil
 }
 
@@ -353,7 +355,8 @@ func (c *Carrier) decide(oldD map[string][][]byte) {
 	defer c.locks.DecisionLock.Unlock()
 	D := oldD
 	c.stores.acceptedHashStore = map[string][][]byte{}
-	log.Info().Msgf("decided %s", D)
+	log.Info().Msgf("decided")
+	log.Debug().Msgf("decided %s", D)
 }
 
 func (c *Carrier) getClientToCarrierAddress() string {

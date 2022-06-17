@@ -79,7 +79,7 @@ func (c *Carrier) decodeNestedSMRDecisions(conn net.Conn) {
 			//continue //TODO
 			panic(err.Error())
 		}
-		log.Info().Msgf("received nested SMR decision %s from %s", N, conn.RemoteAddr())
+		log.Info().Msgf("received nested SMR decision from %s", conn.RemoteAddr())
 		err = c.handleNestedSMRDecision(N)
 		if err != nil {
 			//log.Error().Msgf(err.Error()) //TODO
