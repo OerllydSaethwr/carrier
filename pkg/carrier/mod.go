@@ -223,9 +223,8 @@ func (c *Carrier) Start() *sync.WaitGroup {
 		go connect(n, c.config.carrierConnRetryDelay, c.config.carrierConnMaxRetry)
 	}
 
-	go c.logger()
+	//go c.logger()
 	c.launchWorkerPool(10, c.broadcastWorker)
-	//c.launchWorkerPool(10, c.receiveWorker)
 
 	return c.wg
 }
@@ -256,7 +255,7 @@ func (c *Carrier) NestedPropose(P SuperBlockSummary) error {
 		return err
 	}
 
-	log.Info().Msgf("proposed unknown bytes of data to %s", c.node.GetAddress())
+	log.Info().Msgf("proposed %s to %s", P, c.node.GetAddress())
 	return nil
 }
 

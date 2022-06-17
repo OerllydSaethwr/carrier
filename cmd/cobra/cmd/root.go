@@ -7,6 +7,7 @@ package cmd
 import (
 	"fmt"
 	"github.com/OerllydSaethwr/carrier/pkg/carrier"
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"os"
@@ -53,6 +54,8 @@ func validateCarrier(cmd *cobra.Command, args []string) error {
 }
 
 func runCarrier(cmd *cobra.Command, args []string) error {
+
+	zerolog.SetGlobalLevel(zerolog.InfoLevel)
 
 	c, err := carrier.Load(args[0])
 	if err != nil {

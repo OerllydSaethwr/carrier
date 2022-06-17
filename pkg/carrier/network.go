@@ -12,18 +12,9 @@ func (c *Carrier) broadcast(message message.Message) {
 
 // For communicating with carriers
 func (c *Carrier) executeBroadcast(message message.Message) {
-	log.Info().Msgf("broadcast %s", message.GetType())
+	log.Debug().Msgf("broadcast %s", message.GetType())
 
 	buf := message.BinaryMarshal()
-
-	//println(len(buf))
-	//n0 := buf[8]
-	//n1 := util.UnmarshalUInt64(buf[9:17])
-	//n2 := util.UnmarshalUInt64(buf[17:])
-	//println(n0)
-	//println(n1)
-	//println(n2)
-	//transportMessage := message.Marshal()
 
 	for _, n := range c.neighbours {
 		n.send(buf)
@@ -34,7 +25,6 @@ func (c *Carrier) executeBroadcast(message message.Message) {
 // DO NOT USE - send expects a framedBuf, it will not do the framing. Use framedAndSend instead
 func (n *Neighbour) send(buf []byte) {
 
-	// TODO figure something out with this
 	// Send to dest
 	err := n.GetEncoder().Encode(buf)
 	if err != nil {

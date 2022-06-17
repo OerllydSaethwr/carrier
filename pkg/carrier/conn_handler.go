@@ -57,7 +57,7 @@ func (c *Carrier) handleCarrierConn(conn net.Conn) {
 		var m message.Message
 		err := decoder.Decode(&m)
 
-		log.Info().Msgf("received %s from %s", m.GetType(), m.GetSenderID())
+		log.Debug().Msgf("received %s from %s", m.GetType(), m.GetSenderID())
 
 		// Send to message handler
 		err = c.messageHandlers[m.GetType()](m)
@@ -72,15 +72,15 @@ func (c *Carrier) handleCarrierConn(conn net.Conn) {
 func (c *Carrier) decodeNestedSMRDecisions(conn net.Conn) {
 	decoder := NewBinaryDecoder(conn)
 	for {
-		var superBlockSummary SuperBlockSummary
-		err := decoder.Decode(&superBlockSummary)
+		var N SuperBlockSummary
+		err := decoder.Decode(&N)
 		if err != nil {
 			//log.Error().Msgf(err.Error())
 			//continue //TODO
 			panic(err.Error())
 		}
-		log.Info().Msgf("received nested SMR decision from %s", conn.RemoteAddr())
-		err = c.handleNestedSMRDecision(superBlockSummary)
+		log.Info().Msgf("received nested SMR decision %s from %s", N, conn.RemoteAddr())
+		err = c.handleNestedSMRDecision(N)
 		if err != nil {
 			//log.Error().Msgf(err.Error()) //TODO
 			panic(err.Error())
