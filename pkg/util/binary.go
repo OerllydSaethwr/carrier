@@ -22,13 +22,13 @@ func UnmarshalUInt64(buf []byte) uint64 {
 // MarshalUInt32 returns a byte array of length 8 in little-endian encoding
 func MarshalUInt32(n uint32) []byte {
 	buf := make([]byte, 4)
-	binary.LittleEndian.PutUint32(buf, n)
+	binary.BigEndian.PutUint32(buf, n)
 
 	return buf
 }
 
 func UnmarshalUInt32(buf []byte) uint32 {
-	return binary.LittleEndian.Uint32(buf)
+	return binary.BigEndian.Uint32(buf)
 }
 
 func Build(Vb []byte) [][]byte {

@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/OerllydSaethwr/carrier/pkg/carrier"
+	"github.com/OerllydSaethwr/carrier/pkg/util"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"os"
@@ -17,13 +18,13 @@ func main() {
 	scriptPath := "scripts/"
 	configPath := filePath + "config/"
 
-	nodes := 10
+	nodes := 4
 	hostsFile := ".hosts-local.json"
 	colon := ":"
-	port := 6000
-	frontPort := 9000
+	port := util.BasePort
+	frontPort := util.FrontPort
 	host := "127.0.0.1"
-	portsPerCarrier := 3
+	portsPerCarrier := util.PortsPerCarrier
 
 	zerolog.SetGlobalLevel(zerolog.Disabled)
 

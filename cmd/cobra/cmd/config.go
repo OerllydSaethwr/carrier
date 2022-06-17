@@ -48,9 +48,9 @@ func validateGenerateConfig(cmd *cobra.Command, args []string) error {
 func runGenerateConfig(cmd *cobra.Command, args []string) error {
 	hostsFile := args[0]
 	outDir := args[1]
-	basePort := 6000
+	basePort := util.BasePort
 	colon := ":"
-	portsPerCarrier := 3
+	portsPerCarrier := util.PortsPerCarrier
 
 	rawdata, err := ioutil.ReadFile(hostsFile)
 	if err != nil {
