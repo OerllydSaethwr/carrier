@@ -7,7 +7,7 @@ import (
 
 const (
 	Network               = "tcp4"      // Type of network, choices are in net.DialTCP
-	TsxSize               = 9           // Size of transactions in bytes
+	TsxSize               = 10          // Size of transactions in bytes
 	CarrierConnRetryDelay = time.Second // Delay between retries
 	CarrierConnMaxRetry   = 0           // Number of max retries - 0 means keep trying forever
 	NodeConnRetryDelay    = time.Second // Delay between retries
@@ -22,7 +22,7 @@ const (
 	Client   = 5000
 	Carrier  = 4000
 
-	ForwardMode = false // If set to true, carrier will not do any processing and forward client tsx as they are
+	ForwardMode = true // If set to true, carrier will not do any processing and forward client tsx as they are
 
 	SinkWriteTimeout = time.Second // Drop message after this duration if the sink is full
 

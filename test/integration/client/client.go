@@ -17,7 +17,7 @@ func main() {
 	transaction := make([]byte, util.TsxSize)
 	servAddr := os.Args[1]
 	var counter uint = 0
-	rate := 10
+	rate := 20
 
 	zerolog.SetGlobalLevel(zerolog.Disabled)
 
