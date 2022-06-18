@@ -26,7 +26,8 @@ func main() {
 	host := "127.0.0.1"
 	portsPerCarrier := util.PortsPerCarrier
 
-	zerolog.SetGlobalLevel(zerolog.InfoLevel)
+	zerolog.SetGlobalLevel(util.LogLevel)
+	zerolog.TimeFieldFormat = util.LogTimeFormat
 
 	_, err := exec.Command("rm", "-rf", integrationPath+"log").Output()
 	if err != nil {

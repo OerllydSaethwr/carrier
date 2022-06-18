@@ -1,6 +1,9 @@
 package util
 
-import "time"
+import (
+	"github.com/rs/zerolog"
+	"time"
+)
 
 const (
 	Network               = "tcp4"      // Type of network, choices are in net.DialTCP
@@ -20,4 +23,9 @@ const (
 	Carrier  = 4000
 
 	ForwardMode = false // If set to true, carrier will not do any processing and forward client tsx as they are
+
+	SinkWriteTimeout = time.Second // Drop message after this duration if the sink is full
+
+	LogLevel      = zerolog.InfoLevel // Coordinating log settings between main program and tests
+	LogTimeFormat = zerolog.TimeFormatUnixMs
 )
