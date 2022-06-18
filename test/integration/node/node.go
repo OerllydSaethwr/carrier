@@ -41,24 +41,54 @@ func main() {
 
 // Handles incoming requests.
 func handleRequest(conn net.Conn, da string) {
-	var superBlockSummary carrier.SuperBlockSummary
 	decoder := carrier.NewBinaryDecoder(conn)
 
 	decision := setupDecisionConn(da)
 	encoder := carrier.NewBinaryEncoder(decision)
 	for {
-		err := decoder.Decode(&superBlockSummary)
+
+		var buf []byte
+		err := decoder.Decode(&buf)
 		if err != nil {
 			log.Error().Msgf(err.Error())
 		}
-		log.Info().Msgf("Read %s from %s", superBlockSummary, conn.RemoteAddr())
 
 		time.Sleep(time.Millisecond * 100)
-		err = encoder.Encode(&superBlockSummary)
+		err = encoder.Encode(buf)
 		if err != nil {
 			log.Error().Msgf(err.Error())
 		}
-		log.Info().Msgf("Sent %s to %s", superBlockSummary, da)
+		log.Info().Msgf("Sent %s to %s", buf, da)
+
+		// Legacy code, could be useful
+		// If forward mode is on, don't try to decode the superblock summary
+		//if util.ForwardMode {
+		//	buf := make([]byte, util.TsxSize)
+		//	err := decoder.Decode(&buf)
+		//	if err != nil {
+		//		log.Error().Msgf(err.Error())
+		//	}
+		//	time.Sleep(time.Millisecond*100)
+		//	err = encoder.Encode(buf)
+		//	if err != nil {
+		//		log.Error().Msgf(err.Error())
+		//	}
+		//	continue
+		//}
+		//// Otherwise, decode it
+		//var superBlockSummary carrier.SuperBlockSummary
+		//err := decoder.Decode(&superBlockSummary)
+		//if err != nil {
+		//	log.Error().Msgf(err.Error())
+		//}
+		//log.Info().Msgf("Read %s from %s", superBlockSummary, conn.RemoteAddr())
+
+		//time.Sleep(time.Millisecond * 100)
+		//err = encoder.Encode(&superBlockSummary)
+		//if err != nil {
+		//	log.Error().Msgf(err.Error())
+		//}
+		//log.Info().Msgf("Sent %s to %s", superBlockSummary, da)
 	}
 }
 

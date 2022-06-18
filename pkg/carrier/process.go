@@ -34,10 +34,10 @@ func connect(n Remote, retryDelay time.Duration, maxRetry uint) {
 	for i := uint(0); maxRetry == 0 || i < maxRetry; i++ {
 		conn, err := util.DialTCP(address)
 		if err != nil {
-			log.Info().Msgf("failed to connect to %s %s: %s | attempt %d/%d", n.GetType(), address.String(), err.Error(), i+1, maxRetry)
+			log.Info().Msgf("FAIL - connect to %s %s: %s | attempt %d/%d", n.GetType(), address.String(), err.Error(), i+1, maxRetry)
 			time.Sleep(retryDelay)
 		} else {
-			log.Info().Msgf("connect to %s %s | attempt %d/%d", n.GetType(), address.String(), i+1, maxRetry)
+			log.Info().Msgf("SUCCESS - connect to %s %s | attempt %d/%d", n.GetType(), address.String(), i+1, maxRetry)
 			n.SetConnAndEncoderAndSignalAlive(conn)
 
 			return

@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"github.com/OerllydSaethwr/carrier/pkg/util"
+	"github.com/rs/zerolog/log"
 )
 
 type InitMessage struct {
@@ -34,8 +35,7 @@ func (msg *InitMessage) Marshal() *TransportMessage {
 	payload, err := json.Marshal(msg)
 	transportMessage.Payload = payload
 	if err != nil {
-		//log.Error().Msgf(err.Error()) //TODO Don't panic
-		panic(err)
+		log.Error().Msgf(err.Error())
 	}
 	return transportMessage
 }

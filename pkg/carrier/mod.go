@@ -136,6 +136,7 @@ func NewCarrier(id, clientToCarrierAddr, carrierToCarrierAddr, frontAddr, decisi
 		return nil
 	}
 
+	// TODO move this
 	// Check carrier listener addr
 	_, err = util.ResolveTCPAddr(carrierToCarrierAddr)
 	if err != nil {
@@ -166,20 +167,17 @@ func NewCarrier(id, clientToCarrierAddr, carrierToCarrierAddr, frontAddr, decisi
 	We are not waiting for listeners to stop but I think it's fine
 */
 func (c *Carrier) Start() *sync.WaitGroup {
+	if util.ForwardMode {
+		log.Info().Msgf("ForwardMode is turned on - logging of tsx is at debug level to avoid flooding. If you want to see individual logs, set log level to debug or higher.")
+	}
+
 	c.wg = &sync.WaitGroup{}
 	c.wg.Add(1)
 
 	var err error
 
 	// Listen to nested SMR decisions
-	decision, err := util.ResolveTCPAddr(c.getDecisionAddress())
-	decision.IP = net.ParseIP("0.0.0.0") // We can only host on localhost
-	if err != nil {
-		log.Error().Msgf(err.Error())
-		c.wg.Done()
-		return c.wg
-	}
-	c.listeners.decisionListener, err = util.ListenTCP(decision)
+	c.listeners.decisionListener, err = c.startListener(c.getDecisionAddress())
 	if err != nil {
 		log.Error().Msgf(err.Error())
 		c.wg.Done()
@@ -188,15 +186,8 @@ func (c *Carrier) Start() *sync.WaitGroup {
 	log.Info().Msgf("start listening to nested SMR decisions on %s", c.getDecisionAddress())
 	go c.handleIncomingConnections(c.listeners.decisionListener, c.decodeNestedSMRDecisions)
 
-	// Start client listener
-	client, err := util.ResolveTCPAddr(c.getClientToCarrierAddress())
-	client.IP = net.ParseIP("0.0.0.0")
-	if err != nil {
-		log.Error().Msgf(err.Error())
-		c.wg.Done()
-		return c.wg
-	}
-	c.listeners.clientListener, err = util.ListenTCP(client)
+	// Listen to client
+	c.listeners.clientListener, err = c.startListener(c.getClientToCarrierAddress())
 	if err != nil {
 		log.Error().Msgf(err.Error())
 		c.wg.Done()
@@ -205,23 +196,18 @@ func (c *Carrier) Start() *sync.WaitGroup {
 	log.Info().Msgf("start listening to client on %s", c.getClientToCarrierAddress())
 	go c.handleIncomingConnections(c.listeners.clientListener, c.handleClientConn)
 
-	// Start carrier listener
-	carrier, err := util.ResolveTCPAddr(c.getCarrierToCarrierAddress())
-	carrier.IP = net.ParseIP("0.0.0.0")
+	// Listen to carrier
+	c.listeners.carrierListener, err = c.startListener(c.getCarrierToCarrierAddress())
 	if err != nil {
 		log.Error().Msgf(err.Error())
 		c.wg.Done()
 		return c.wg
 	}
-	c.listeners.carrierListener, err = util.ListenTCP(carrier)
-	if err != nil {
-		log.Error().Msgf(err.Error())
-	}
 	log.Info().Msgf("start listening to neighbours on %s", c.getCarrierToCarrierAddress())
 	go c.handleIncomingConnections(c.listeners.carrierListener, c.handleCarrierConn)
 
 	//Connect to node
-	connect(c.node, c.config.nodeConnRetryDelay, c.config.nodeConnMaxRetry)
+	go connect(c.node, c.config.nodeConnRetryDelay, c.config.nodeConnMaxRetry)
 
 	// Set up connections to other neighbours
 	for _, n := range c.neighbours {
@@ -270,7 +256,7 @@ func (c *Carrier) GetStringPK() string {
 func (c *Carrier) GetKyberSK() kyber.Scalar {
 	skk, err := util.DecodeStringToBdnSK(c.keypair.Sk)
 	if err != nil {
-		panic("unable to decode SK") //TODO
+		panic("unable to decode SK")
 	}
 
 	return skk
@@ -279,7 +265,7 @@ func (c *Carrier) GetKyberSK() kyber.Scalar {
 func (c *Carrier) GetKyberPK() kyber.Point {
 	pkk, err := util.DecodeStringToBdnPK(c.keypair.Pk)
 	if err != nil {
-		panic("unable to decode SK") //TODO
+		panic("unable to decode SK")
 	}
 
 	return pkk
@@ -306,11 +292,11 @@ func (c *Carrier) Verify(h string, s util.Signature) error {
 
 	hb, err := hex.DecodeString(h)
 	if err != nil {
-		panic("verify failed: failed to decode h")
+		return fmt.Errorf("failed to decode h: %s", err.Error())
 	}
 	sb, err := hex.DecodeString(s.S)
 	if err != nil {
-		panic("verify failed: failed to decode s")
+		return fmt.Errorf("failed to decode s: %s", err.Error())
 	}
 	err = bdn.Verify(c.suite, pk, hb, sb)
 	return err
@@ -371,4 +357,15 @@ func (c *Carrier) getDecisionAddress() string {
 
 func (c *Carrier) GetID() string {
 	return c.id
+}
+
+func (c *Carrier) startListener(address string) (*net.TCPListener, error) {
+	resolvedAddress, err := util.ResolveTCPAddr(address)
+	resolvedAddress.IP = net.ParseIP("0.0.0.0") // We can only host on localhost
+	if err != nil {
+		return nil, err
+	}
+	listener, err := util.ListenTCP(resolvedAddress)
+
+	return listener, err
 }

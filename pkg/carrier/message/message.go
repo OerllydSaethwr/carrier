@@ -20,8 +20,11 @@ type TransportMessage struct {
 }
 
 type Message interface {
+	// Payload @Deprecated
 	Payload() []byte
+	// Hash @Deprecated
 	Hash() string
+	// Marshal @Deprecated
 	Marshal() *TransportMessage
 	GetSenderID() string
 	GetType() Type

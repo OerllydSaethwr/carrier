@@ -4,7 +4,6 @@ import (
 	"github.com/OerllydSaethwr/carrier/pkg/carrier/message"
 	"github.com/OerllydSaethwr/carrier/pkg/util"
 	"github.com/rs/zerolog/log"
-	"io"
 	"net"
 	"sync/atomic"
 )
@@ -14,17 +13,41 @@ import (
 func (c *Carrier) handleClientConn(conn net.Conn) {
 	// Make a buffer to hold incoming data.
 	// Read the incoming connection into the buffer.
+	decoder := NewBinaryDecoder(conn)
 outerLoop:
 	for {
+
+		// If we're in ForwardMode, forward messages to node without any processing
+		if util.ForwardMode {
+			buf := make([]byte, util.TsxSize)
+			err := decoder.Decode(&buf)
+			if err != nil {
+				log.Error().Msgf(err.Error())
+				break outerLoop
+			}
+
+			err = c.node.GetEncoder().Encode(buf)
+			if err != nil {
+				log.Error().Msgf(err.Error())
+				break outerLoop
+			}
+			log.Debug().Msgf("forward tsx to %s", c.node.GetAddress())
+			continue
+		}
+
+		// Otherwise, do normal processing
 		initMessage := message.NewInitMessage(
 			make([][]byte, 0),
 			c.GetID(),
 		)
 		for i := 0; i < util.MempoolThreshold; i++ {
-			buf := make([]byte, util.TsxSize) //TODO make this configurable
-			_, err := io.ReadAtLeast(conn, buf, util.TsxSize)
+			buf := make([]byte, util.TsxSize)
+
+			err := decoder.Decode(&buf)
+			//buf := make([]byte, util.TsxSize) //TODO make this configurable
+			//_, err := io.ReadAtLeast(conn, buf, util.TsxSize)
 			if err != nil {
-				log.Info().Msgf(err.Error())
+				log.Error().Msgf(err.Error())
 				break outerLoop
 			}
 
@@ -38,15 +61,14 @@ outerLoop:
 
 		atomic.AddUint64(&c.counter, 1)
 
-		//TODO tomorrow broadcast slows down client to about 500,000 tsx, carrier to 200,000. definite bottleneck, check marshalling
 		c.broadcast(initMessage)
 	}
 
+	log.Info().Msgf("close client connection %s", conn.RemoteAddr())
 	err := conn.Close()
 	if err != nil {
 		log.Error().Msgf(err.Error())
 	}
-	log.Info().Msgf("close client connection %s", conn.RemoteAddr())
 }
 
 func (c *Carrier) handleCarrierConn(conn net.Conn) {
@@ -56,14 +78,18 @@ func (c *Carrier) handleCarrierConn(conn net.Conn) {
 		// We expect packets framed using util.Frame - they will contain a uint32 (4 bytes) describing the length of the incoming stream
 		var m message.Message
 		err := decoder.Decode(&m)
+		if err != nil {
+			log.Error().Msgf(err.Error())
+			continue
+		}
 
 		log.Debug().Msgf("received %s from %s", m.GetType(), m.GetSenderID())
 
 		// Send to message handler
 		err = c.messageHandlers[m.GetType()](m)
 		if err != nil {
-			log.Error().Msgf(err.Error())
-			panic("message handler returned error")
+			log.Error().Msgf("should not get here - garbage messages should be caught during decoding")
+			panic("message handler returned error: " + err.Error())
 		}
 
 	}
@@ -72,18 +98,26 @@ func (c *Carrier) handleCarrierConn(conn net.Conn) {
 func (c *Carrier) decodeNestedSMRDecisions(conn net.Conn) {
 	decoder := NewBinaryDecoder(conn)
 	for {
+		// Only decode byte array if we're in forward mode
+		if util.ForwardMode {
+			var buf []byte
+			err := decoder.Decode(&buf)
+			if err != nil {
+				log.Error().Msgf(err.Error())
+			}
+			log.Debug().Msgf("received nested SMR decision from %s", c.node.GetAddress())
+			continue
+		}
+
 		var N SuperBlockSummary
 		err := decoder.Decode(&N)
 		if err != nil {
-			//log.Error().Msgf(err.Error())
-			//continue //TODO
-			panic(err.Error())
+			log.Error().Msgf(err.Error())
+
+			// Ignore garbage messages
+			continue
 		}
-		log.Info().Msgf("received nested SMR decision from %s", conn.RemoteAddr())
-		err = c.handleNestedSMRDecision(N)
-		if err != nil {
-			//log.Error().Msgf(err.Error()) //TODO
-			panic(err.Error())
-		}
+		log.Info().Msgf("received nested SMR decision from %s", c.node.GetAddress())
+		c.handleNestedSMRDecision(N)
 	}
 }

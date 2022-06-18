@@ -119,7 +119,8 @@ func (c *Carrier) handleResolveMessage(rawMessage message.Message) error {
 	return nil
 }
 
-func (c *Carrier) handleNestedSMRDecision(N SuperBlockSummary) error {
+// handleNestedSMRDecision assumes that N is safe and correct
+func (c *Carrier) handleNestedSMRDecision(N SuperBlockSummary) {
 	// Adding a bottleneck here because of time constaints
 	// We should be able to process Nested SMR decisions concurrently
 	// This requires us to keep a separate instance of D for each decision we receive
@@ -161,6 +162,4 @@ outer:
 	}
 
 	c.checkAcceptedHashStoreAndDecide()
-
-	return nil
 }

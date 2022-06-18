@@ -1,48 +1,6 @@
 package carrier
 
-import (
-	"github.com/OerllydSaethwr/carrier/pkg/carrier/message"
-	"github.com/OerllydSaethwr/carrier/pkg/util"
-	"github.com/rs/zerolog/log"
-	"io"
-	"net"
-	"sync"
-)
-
-type BinaryEncoder struct {
-	conn net.Conn
-	lock *sync.RWMutex
-}
-
-func NewBinaryEncoder(conn net.Conn) *BinaryEncoder {
-	return &BinaryEncoder{
-		conn: conn,
-		lock: &sync.RWMutex{},
-	}
-}
-
-func (be *BinaryEncoder) Encode(e any) error {
-
-	var err error
-	var toSend []byte
-
-	switch data := e.(type) {
-	case message.Message:
-		toSend = data.BinaryMarshal()
-	case *SuperBlockSummary:
-		toSend = encodeSuperBlockSummary(data)
-	case []byte:
-		toSend = data
-	default:
-		panic("not implemented")
-	}
-
-	be.lock.Lock()
-	_, err = be.conn.Write(util.Frame(toSend))
-	be.lock.Unlock()
-
-	return err
-}
+import "github.com/OerllydSaethwr/carrier/pkg/util"
 
 func encodeSuperBlockSummary(P *SuperBlockSummary) []byte {
 	buf := make([]byte, 0)
@@ -85,60 +43,6 @@ func encodeSuperBlockSummary(P *SuperBlockSummary) []byte {
 	}
 
 	return buf
-}
-
-type BinaryDecoder struct {
-	conn net.Conn
-	lock *sync.RWMutex
-}
-
-func NewBinaryDecoder(conn net.Conn) *BinaryDecoder {
-	return &BinaryDecoder{
-		conn: conn,
-		lock: &sync.RWMutex{},
-	}
-}
-
-func (bd *BinaryDecoder) Decode(e any) error {
-	var err error
-	buf := make([]byte, 4)
-
-	bd.lock.Lock()
-
-	_, err = io.ReadFull(bd.conn, buf)
-	if err != nil {
-		log.Error().Msgf(err.Error())
-		panic(err)
-	}
-	ls := util.UnmarshalUInt32(buf)
-
-	buf2 := make([]byte, ls)
-	_, err = io.ReadFull(bd.conn, buf2)
-	if err != nil {
-		log.Error().Msgf(err.Error())
-		panic(err)
-	}
-
-	bd.lock.Unlock()
-
-	switch data := e.(type) {
-
-	/* I had to do some tricks here to avoid having to register types. The interface message.Message is always a pointer,
-	but Go wouldn't let me dereference it, so I had to create a pointer to the interface so that I can change the
-	value stored at the underlying address without returning anything, to respect the Decoder interface */
-	case *message.Message:
-		//TODO I'm not sure this pointer magic works
-		_, m := message.BinaryUnmarshal(buf2)
-		*data = m
-	case *SuperBlockSummary:
-		*data = decodeSuperBlockSummary(buf2)
-	case []byte:
-		panic("not implemented")
-	default:
-		panic("not implemented")
-	}
-
-	return err
 }
 
 // Very inconsistent when compared with message.BinaryUnmarshal
