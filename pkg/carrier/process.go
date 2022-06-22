@@ -49,13 +49,27 @@ func (c *Carrier) checkAcceptedHashStoreAndDecide() {
 	c.locks.AcceptedHashStore.Lock()
 	defer c.locks.AcceptedHashStore.Unlock()
 
-	for _, v := range c.stores.acceptedHashStore {
+	decidedHashes := make([]string, 0)
+	for h, v := range c.stores.acceptedHashStore {
+
+		// If we don't have all hashes, abort
 		if v == nil {
 			return
 		}
+		decidedHashes = append(decidedHashes, h)
 	}
 
-	c.decide(c.stores.acceptedHashStore)
+	// Decide
+	defer c.locks.DecisionLock.Unlock()
+	D := c.stores.acceptedHashStore
+	c.stores.acceptedHashStore = map[string][][]byte{}
+	for _, hash := range decidedHashes {
+		c.stores.decidedHashStore[hash] = struct{}{}
+	}
+
+	log.Info().Msgf("total hashes decided: %d", len(c.stores.decidedHashStore))
+
+	decide(D)
 }
 
 func (c *Carrier) logger() {
@@ -76,9 +90,3 @@ func (c *Carrier) broadcastWorker() {
 		c.executeBroadcast(<-c.broadcastDispenser)
 	}
 }
-
-//func (c *Carrier) receiveWorker() {
-//	for {
-//		c.receiveMessage()
-//	}
-//}

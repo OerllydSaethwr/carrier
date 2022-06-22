@@ -22,6 +22,8 @@ type Stores struct {
 	signatureStore    map[string][]util.Signature
 	superBlockSummary map[string][]util.Signature
 	acceptedHashStore map[string][][]byte
+
+	decidedHashStore map[string]interface{}
 }
 
 type Listeners struct {

@@ -87,6 +87,8 @@ func NewCarrier(config *util.Config) *Carrier {
 		signatureStore:    map[string][]util.Signature{},
 		superBlockSummary: map[string][]util.Signature{},
 		acceptedHashStore: map[string][][]byte{},
+
+		decidedHashStore: map[string]any{},
 	}
 
 	//var err error
@@ -283,12 +285,14 @@ func (c *Carrier) GetSuite() pairing.Suite {
 	return c.suite.Suite
 }
 
-func (c *Carrier) decide(oldD map[string][][]byte) {
-	defer c.locks.DecisionLock.Unlock()
-	D := oldD
-	c.stores.acceptedHashStore = map[string][][]byte{}
-	log.Info().Msgf("decided")
-	log.Debug().Msgf("decided %s", D)
+func decide(D map[string][][]byte) {
+
+	// Process decided values
+	decidedHashes := make([]string, 0)
+	for h, _ := range D {
+		decidedHashes = append(decidedHashes, h)
+	}
+	log.Info().Msgf("decided %s", decidedHashes)
 }
 
 func (c *Carrier) getClientToCarrierAddress() string {
