@@ -20,8 +20,8 @@ type Locks struct {
 type Stores struct {
 	valueStore        map[string][][]byte
 	signatureStore    map[string][]util.Signature
-	superBlockSummary map[string][]util.Signature
-	acceptedHashStore map[string][][]byte
+	superBlockSummary SuperBlockSummary
+	acceptedHashStore AcceptedHashStore
 }
 
 type Listeners struct {
@@ -43,13 +43,15 @@ type Addresses struct {
 	decision        string
 }
 
-type SuperBlockSummaryItem struct {
-	ID string           `json:"ID"`
-	H  string           `json:"h"`
-	S  []util.Signature `json:"s"`
+type SuperBlockSummary struct {
+	id      uint32
+	payload map[string][]util.Signature
 }
 
-type SuperBlockSummary map[string][]util.Signature
+type AcceptedHashStore struct {
+	id      uint32
+	payload map[string][][]byte
+}
 
 type Remote interface {
 	GetAddress() string

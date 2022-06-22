@@ -55,8 +55,8 @@ outerLoop:
 
 		log.Debug().Msgf("V %d", len(c.stores.valueStore))
 		log.Debug().Msgf("S %d", len(c.stores.signatureStore))
-		log.Debug().Msgf("P %d", len(c.stores.superBlockSummary))
-		log.Debug().Msgf("D %d", len(c.stores.acceptedHashStore))
+		log.Debug().Msgf("P %d", len(c.stores.superBlockSummary.payload))
+		log.Debug().Msgf("D %d", len(c.stores.acceptedHashStore.payload))
 
 		atomic.AddUint64(&c.counter, 1)
 
@@ -116,7 +116,7 @@ func (c *Carrier) decodeNestedSMRDecisions(conn net.Conn) {
 			// Ignore garbage messages
 			continue
 		}
-		log.Info().Msgf("received nested SMR decision from %s", c.node.GetAddress())
+		log.Info().Msgf("received nested SMR decision from %s: superblock %d", c.node.GetAddress(), N.id)
 		c.handleNestedSMRDecision(N)
 	}
 }

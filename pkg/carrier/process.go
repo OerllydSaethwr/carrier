@@ -49,7 +49,7 @@ func (c *Carrier) checkAcceptedHashStoreAndDecide() {
 	c.locks.AcceptedHashStore.Lock()
 	defer c.locks.AcceptedHashStore.Unlock()
 
-	for _, v := range c.stores.acceptedHashStore {
+	for _, v := range c.stores.acceptedHashStore.payload {
 		if v == nil {
 			return
 		}

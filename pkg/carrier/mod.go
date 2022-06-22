@@ -41,7 +41,8 @@ type Carrier struct {
 
 	quit               chan bool
 	broadcastDispenser chan message.Message
-	sbsCounter         int
+	sbsCounter         uint32
+	ahsCounter         uint32
 }
 
 func NewCarrier(config *util.Config) *Carrier {
@@ -58,6 +59,7 @@ func NewCarrier(config *util.Config) *Carrier {
 	c.counter = 0
 	c.broadcastDispenser = make(chan message.Message, int64(math.Pow10(7)))
 	c.sbsCounter = 0
+	c.ahsCounter = 0
 
 	c.suite = pairing.NewSuiteBn256()
 
@@ -83,10 +85,16 @@ func NewCarrier(config *util.Config) *Carrier {
 	}
 
 	c.stores = Stores{
-		valueStore:        map[string][][]byte{},
-		signatureStore:    map[string][]util.Signature{},
-		superBlockSummary: map[string][]util.Signature{},
-		acceptedHashStore: map[string][][]byte{},
+		valueStore:     map[string][][]byte{},
+		signatureStore: map[string][]util.Signature{},
+		superBlockSummary: SuperBlockSummary{
+			id:      c.sbsCounter,
+			payload: map[string][]util.Signature{},
+		},
+		acceptedHashStore: AcceptedHashStore{
+			id:      c.ahsCounter,
+			payload: map[string][][]byte{},
+		},
 	}
 
 	//var err error
@@ -130,7 +138,7 @@ func NewCarrier(config *util.Config) *Carrier {
 */
 func (c *Carrier) Start() *sync.WaitGroup {
 	if c.forwardMode() {
-		log.Info().Msgf("ForwardMode is turned on - logging of tsx is at debug level to avoid flooding. If you want to see individual logs, set log level to debug or higher.")
+		log.Info().Msgf("ForwardMode is turned on - logging of tsx is at info level to avoid flooding. If you want to see individual logs, set log level to debug or higher.")
 	}
 
 	c.wg = &sync.WaitGroup{}
@@ -182,6 +190,7 @@ func (c *Carrier) Start() *sync.WaitGroup {
 	return c.wg
 }
 
+// Stop TODO stop should stop all running processes
 func (c *Carrier) Stop() {
 	log.Trace().Msgf("stop Carrier")
 	err := c.listeners.clientListener.Close()
@@ -203,7 +212,7 @@ func (c *Carrier) NestedPropose(P SuperBlockSummary) error {
 		return err
 	}
 
-	log.Info().Msgf("proposed SuperBlock %d to %s", c.sbsCounter, c.node.GetAddress())
+	log.Info().Msgf("proposed superblock %d to %s", c.sbsCounter, c.node.GetAddress())
 	return nil
 }
 
@@ -283,12 +292,11 @@ func (c *Carrier) GetSuite() pairing.Suite {
 	return c.suite.Suite
 }
 
-func (c *Carrier) decide(oldD map[string][][]byte) {
+func (c *Carrier) decide(D AcceptedHashStore) {
 	defer c.locks.DecisionLock.Unlock()
-	D := oldD
-	c.stores.acceptedHashStore = map[string][][]byte{}
-	log.Info().Msgf("decided")
-	log.Debug().Msgf("decided %s", D)
+	c.refreshAcceptedHashStore()
+	log.Info().Msgf("decided %d", D.id)
+	log.Debug().Msgf("decided %s", D.payload)
 }
 
 func (c *Carrier) getClientToCarrierAddress() string {
@@ -328,4 +336,20 @@ func (c *Carrier) getTsxSize() int {
 
 func (c *Carrier) getMempoolThreshold() int {
 	return c.config.Settings.InitThreshold
+}
+
+func (c *Carrier) refreshSuperBlock() {
+	c.sbsCounter++
+	c.stores.superBlockSummary = SuperBlockSummary{
+		id:      c.sbsCounter,
+		payload: map[string][]util.Signature{},
+	}
+}
+
+func (c *Carrier) refreshAcceptedHashStore() {
+	c.ahsCounter++
+	c.stores.acceptedHashStore = AcceptedHashStore{
+		id:      c.ahsCounter,
+		payload: map[string][][]byte{},
+	}
 }

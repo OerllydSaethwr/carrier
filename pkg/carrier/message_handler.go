@@ -51,7 +51,7 @@ func (c *Carrier) handleEchoMessage(rawMessage message.Message) error {
 		// @Critical C2
 		if len(c.stores.signatureStore[echoM.H]) == c.f+1 {
 			c.locks.SuperBlockSummary.Lock()
-			c.stores.superBlockSummary[echoM.H] = c.stores.signatureStore[echoM.H]
+			c.stores.superBlockSummary.payload[echoM.H] = c.stores.signatureStore[echoM.H]
 			c.locks.SuperBlockSummary.Unlock()
 		}
 
@@ -59,10 +59,9 @@ func (c *Carrier) handleEchoMessage(rawMessage message.Message) error {
 	}
 
 	c.locks.SuperBlockSummary.Lock()
-	if len(c.stores.superBlockSummary) == c.n-c.f {
+	if len(c.stores.superBlockSummary.payload) == c.n-c.f {
 		err = c.NestedPropose(c.stores.superBlockSummary)
-		c.stores.superBlockSummary = map[string][]util.Signature{}
-		c.sbsCounter++ // Advance superblockcounter
+		c.refreshSuperBlock()
 	}
 	c.locks.SuperBlockSummary.Unlock()
 	if err != nil {
@@ -108,8 +107,8 @@ func (c *Carrier) handleResolveMessage(rawMessage message.Message) error {
 	}
 
 	c.locks.AcceptedHashStore.Lock()
-	if _, ok := c.stores.acceptedHashStore[h]; ok {
-		c.stores.acceptedHashStore[h] = resolveM.V
+	if _, ok := c.stores.acceptedHashStore.payload[h]; ok {
+		c.stores.acceptedHashStore.payload[h] = resolveM.V
 
 	}
 	c.locks.AcceptedHashStore.Unlock()
@@ -128,7 +127,7 @@ func (c *Carrier) handleNestedSMRDecision(N SuperBlockSummary) {
 
 	c.locks.DecisionLock.Lock()
 outer:
-	for h, S := range N {
+	for h, S := range N.payload {
 		if len(S) != c.f+1 {
 			continue outer
 		}
@@ -144,14 +143,14 @@ outer:
 		c.locks.AcceptedHashStore.Lock()
 		c.locks.ValueStore.Lock()
 		if _, ok := c.stores.valueStore[h]; ok {
-			c.stores.acceptedHashStore[h] = c.stores.valueStore[h]
+			c.stores.acceptedHashStore.payload[h] = c.stores.valueStore[h]
 
 			// Unlock
 			c.locks.ValueStore.Unlock()
 			c.locks.AcceptedHashStore.Unlock()
 
 		} else {
-			c.stores.acceptedHashStore[h] = nil
+			c.stores.acceptedHashStore.payload[h] = nil
 
 			// Unlock
 			c.locks.ValueStore.Unlock()

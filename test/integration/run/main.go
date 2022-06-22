@@ -21,8 +21,8 @@ func main() {
 	nodes := 4
 	frontPort := 9000
 	tsxSize := 128
-	rate := 5
-	initThreshold := 10
+	rate := 100000
+	initThreshold := 1
 
 	paramsFile := ".hosts-local.json"
 	colon := ":"
