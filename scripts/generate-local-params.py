@@ -4,8 +4,7 @@ import struct
 import sys
 from json import dump
 
-# Pass 2 args: number of hosts to generate, output file
-# set number of hosts to generate in the settings below by setting nodes
+# Pass 5 args: output file, number of hosts, tsx-size, rate and init-threshold
 
 hf = {
     "hosts": [],
@@ -19,7 +18,7 @@ hf = {
         "carrier-port": 4000,
         "client-port": 5000,
 
-        "mempool-threshold": 100,
+        "init-threshold": 100,
         "forward-mode": 0,
         "log-level": "info",
 
@@ -32,6 +31,11 @@ hf = {
         "local-front-port": 9000,
     }
 }
+
+hf["settings"]["nodes"] = int(sys.argv[2])
+hf["settings"]["tsx-size"] = int(sys.argv[3])
+hf["settings"]["rate"] = int(sys.argv[4])
+hf["settings"]["init-threshold"] = int(sys.argv[5])
 
 for i in range(hf["settings"]["nodes"]):
     ip = "127.0.0.1"

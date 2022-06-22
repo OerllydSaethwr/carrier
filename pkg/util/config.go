@@ -46,9 +46,9 @@ type Settings struct {
 	ClientPort   int `json:"client-port"`
 	CarrierPort  int `json:"carrier-port"`
 
-	MempoolThreshold int    `json:"mempool-threshold"`
-	ForwardMode      int    `json:"forward-mode"`
-	LogLevel         string `json:"log-level"`
+	InitThreshold int    `json:"init-threshold"`
+	ForwardMode   int    `json:"forward-mode"`
+	LogLevel      string `json:"log-level"`
 
 	CarrierConnRetryDelay int `json:"carrier-conn-retry-delay"`
 	CarrierConnMaxRetry   int `json:"carrier-conn-max-retry"`
@@ -68,7 +68,7 @@ func NewSettings() Settings {
 		CarrierConnMaxRetry:   0,
 		NodeConnRetryDelay:    1000,
 		NodeConnMaxRetry:      0,
-		MempoolThreshold:      100,
+		InitThreshold:         100,
 		LocalBasePort:         6000,
 		LocalFrontPort:        9000,
 		DecisionPort:          3000,

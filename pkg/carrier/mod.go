@@ -327,5 +327,5 @@ func (c *Carrier) getTsxSize() int {
 }
 
 func (c *Carrier) getMempoolThreshold() int {
-	return c.config.Settings.MempoolThreshold
+	return c.config.Settings.InitThreshold
 }

@@ -18,10 +18,15 @@ func main() {
 	scriptPath := "scripts/"
 	configPath := filePath + "config/"
 
-	nodes := util.LocalNodes
+	nodes := 4
+	frontPort := 9000
+	tsxSize := 128
+	rate := 5
+	initThreshold := 10
+
 	paramsFile := ".hosts-local.json"
 	colon := ":"
-	frontPort := util.LocalFrontPort
+
 	host := "127.0.0.1"
 	portsPerCarrier := util.PortsPerCarrier
 
@@ -40,7 +45,7 @@ func main() {
 	}
 	//log.Info().Msgf(string(output))
 
-	cmd := exec.Command("python3", scriptPath+"generate-local-params.py", filePath+paramsFile)
+	cmd := exec.Command("python3", scriptPath+"generate-local-params.py", filePath+paramsFile, strconv.Itoa(nodes), strconv.Itoa(tsxSize), strconv.Itoa(rate), strconv.Itoa(initThreshold))
 	_, err = cmd.Output()
 	if err != nil {
 		log.Error().Msgf(err.Error())
