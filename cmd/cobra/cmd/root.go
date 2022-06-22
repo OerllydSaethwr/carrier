@@ -7,6 +7,7 @@ package cmd
 import (
 	"fmt"
 	"github.com/OerllydSaethwr/carrier/pkg/carrier"
+	"github.com/OerllydSaethwr/carrier/pkg/util"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -55,7 +56,8 @@ func validateCarrier(cmd *cobra.Command, args []string) error {
 
 func runCarrier(cmd *cobra.Command, args []string) error {
 
-	zerolog.SetGlobalLevel(zerolog.InfoLevel)
+	zerolog.SetGlobalLevel(util.LogLevel)
+	zerolog.TimeFieldFormat = util.LogTimeFormat
 
 	c, err := carrier.Load(args[0])
 	if err != nil {
