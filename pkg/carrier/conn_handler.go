@@ -2,7 +2,6 @@ package carrier
 
 import (
 	"github.com/OerllydSaethwr/carrier/pkg/carrier/message"
-	"github.com/OerllydSaethwr/carrier/pkg/util"
 	"github.com/rs/zerolog/log"
 	"net"
 	"sync/atomic"
@@ -18,8 +17,8 @@ outerLoop:
 	for {
 
 		// If we're in ForwardMode, forward messages to node without any processing
-		if util.ForwardMode {
-			buf := make([]byte, util.TsxSize)
+		if c.forwardMode() {
+			buf := make([]byte, c.getTsxSize())
 			err := decoder.Decode(&buf)
 			if err != nil {
 				log.Error().Msgf(err.Error())
@@ -40,8 +39,8 @@ outerLoop:
 			make([][]byte, 0),
 			c.GetID(),
 		)
-		for i := 0; i < util.MempoolThreshold; i++ {
-			buf := make([]byte, util.TsxSize)
+		for i := 0; i < c.getMempoolThreshold(); i++ {
+			buf := make([]byte, c.getTsxSize())
 
 			err := decoder.Decode(&buf)
 			//buf := make([]byte, util.TsxSize) //TODO make this configurable
@@ -99,7 +98,7 @@ func (c *Carrier) decodeNestedSMRDecisions(conn net.Conn) {
 	decoder := NewBinaryDecoder(conn)
 	for {
 		// Only decode byte array if we're in forward mode
-		if util.ForwardMode {
+		if c.forwardMode() {
 			var buf []byte
 			err := decoder.Decode(&buf)
 			if err != nil {

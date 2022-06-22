@@ -25,13 +25,13 @@ func (c *Carrier) handleIncomingConnections(l *net.TCPListener, handler func(con
 	}
 }
 
-func connect(n Remote, retryDelay time.Duration, maxRetry uint) {
+func connect(n Remote, retryDelay time.Duration, maxRetry int) {
 	// If xxxConnMaxRetry is 0, we keep retrying indefinitely
 	address, err := util.ResolveTCPAddr(n.GetAddress())
 	if err != nil {
 		log.Error().Msgf(err.Error())
 	}
-	for i := uint(0); maxRetry == 0 || i < maxRetry; i++ {
+	for i := 0; maxRetry == 0 || i < maxRetry; i++ {
 		conn, err := util.DialTCP(address)
 		if err != nil {
 			log.Info().Msgf("FAIL - connect to %s %s: %s | attempt %d/%d", n.GetType(), address.String(), err.Error(), i+1, maxRetry)

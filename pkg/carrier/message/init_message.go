@@ -57,25 +57,34 @@ func (msg *InitMessage) BinaryMarshal() []byte {
 	// 1. Put message type as a single byte. InitMessage has type 0
 	buf = append(buf, byte(0))
 
-	// 2. Put size of SenderID as 8 bytes - uint64
+	// 2. Put tsxSize as 4 bytes - uint32
+	tsxSizeb := util.MarshalUInt32(0)
+	if len(msg.V) > 0 {
+
+		// Tricky here - get the tsx size from the size of the first entry in V.
+		// It would be nice to make this flexible (and also not too much effort)
+		tsxSizeb = util.MarshalUInt32(uint32(len(msg.V[0])))
+	}
+	buf = append(buf, tsxSizeb...)
+
+	// 3. Put size of SenderID as 8 bytes - uint64
 	senderIDb := []byte(msg.SenderID)
 	senderIDsize := util.MarshalUInt64(uint64(len(senderIDb)))
 	//println("i " + strconv.Itoa(len(senderIDb)))
 	buf = append(buf, senderIDsize...)
 
-	// 3. Put size of V as 8 bytes - uint64
+	// 4. Put size of V as 8 bytes - uint64
 	var lenSumCounter int
 	for _, e := range msg.V {
 		lenSumCounter += len(e)
 	}
 	lenSum := util.MarshalUInt64(uint64(lenSumCounter))
-	//println("i " + strconv.Itoa(lenSumCounter))
 	buf = append(buf, lenSum...)
 
-	// 4. Put byte representation of SenderID
+	// 5. Put byte representation of SenderID
 	buf = append(buf, senderIDb...)
 
-	// 5. Put flattened byte array of V
+	// 6. Put flattened byte array of V
 	// Tsx is currently fixed so each element of V should have the same size. This will be crucial when decoding the struct.
 	// @Critical C3 - if you change this condition, marshalling-unmarshalling will break
 	for _, e := range msg.V {
@@ -87,17 +96,31 @@ func (msg *InitMessage) BinaryMarshal() []byte {
 
 // BinaryUnmarshal should only be called by message.BinaryUnmarshal
 func (msg *InitMessage) BinaryUnmarshal(buf []byte) {
+
+	// 2. Decode tsxSize - 4 bytes
+	curr := 0
+	next := 4
+	tsxSize := util.UnmarshalUInt32(buf[curr:next])
+
 	// 2. Decode SenderIDsize - 8 bytes
-	senderIDsize := util.UnmarshalUInt64(buf[:8])
+	curr = next
+	next += 8
+	senderIDsize := util.UnmarshalUInt64(buf[curr:next])
 
 	// 3. Decode size of V - 8 bytes
-	lenSum := util.UnmarshalUInt64(buf[8:16])
+	curr = next
+	next += 8
+	lenSum := util.UnmarshalUInt64(buf[curr:next])
 
 	// 4. Decode SenderID - senderIDsize bytes
-	senderIDb := buf[16 : 16+senderIDsize]
+	curr = next
+	next += int(senderIDsize)
+	senderIDb := buf[curr:next]
 	msg.SenderID = string(senderIDb)
 
 	// 5. Decode V - lenSum bytes
-	Vb := buf[16+senderIDsize : 16+senderIDsize+lenSum]
-	msg.V = util.Build(Vb)
+	curr = next
+	next += int(lenSum)
+	Vb := buf[curr:next]
+	msg.V = util.Build(Vb, int(tsxSize))
 }

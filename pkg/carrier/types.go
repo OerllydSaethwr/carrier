@@ -30,7 +30,7 @@ type Listeners struct {
 	decisionListener *net.TCPListener
 }
 
-type Config struct {
+type ConnRetrySettings struct {
 	carrierConnRetryDelay time.Duration
 	carrierConnMaxRetry   uint
 	nodeConnRetryDelay    time.Duration

@@ -2,11 +2,6 @@ package util
 
 import "encoding/binary"
 
-const (
-	Suint64 uint8 = 8
-	Suint32 uint8 = 4
-)
-
 // MarshalUInt64 returns a byte array of length 8 in little-endian encoding
 func MarshalUInt64(n uint64) []byte {
 	buf := make([]byte, 8)
@@ -31,10 +26,10 @@ func UnmarshalUInt32(buf []byte) uint32 {
 	return binary.BigEndian.Uint32(buf)
 }
 
-func Build(Vb []byte) [][]byte {
-	V := make([][]byte, len(Vb)/TsxSize)
-	for i := 0; i < len(Vb); i += TsxSize {
-		V[i/TsxSize] = Vb[i : i+TsxSize]
+func Build(Vb []byte, tsxSize int) [][]byte {
+	V := make([][]byte, len(Vb)/tsxSize)
+	for i := 0; i < len(Vb); i += tsxSize {
+		V[i/tsxSize] = Vb[i : i+tsxSize]
 	}
 
 	return V

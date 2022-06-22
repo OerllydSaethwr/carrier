@@ -7,15 +7,29 @@ import (
 	"math/rand"
 	"net"
 	"os"
+	"strconv"
 	"time"
 )
 
+// Client takes 3 arguments: server-address, tsx-size and rate
 func main() {
 	var err error
 	var conn *net.TCPConn
 
-	transaction := make([]byte, util.TsxSize)
 	servAddr := os.Args[1]
+
+	tsxSize, err := strconv.Atoi(os.Args[2])
+	if err != nil {
+		log.Error().Msgf(err.Error())
+		return
+	}
+	rate, err := strconv.Atoi(os.Args[3])
+	if err != nil {
+		log.Error().Msgf(err.Error())
+		return
+	}
+
+	transaction := make([]byte, tsxSize)
 	var counter uint = 0
 
 	zerolog.SetGlobalLevel(zerolog.Disabled)
@@ -52,7 +66,7 @@ func main() {
 		}
 		log.Info().Msgf("Send %d bytes to %s", len(transaction), servAddr)
 		counter++
-		time.Sleep(time.Duration(int64(time.Second) / int64(util.Rate)))
+		time.Sleep(time.Duration(int64(time.Second) / int64(rate)))
 	}
 
 	conn.Close()

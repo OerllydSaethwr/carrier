@@ -2,7 +2,6 @@ package carrier
 
 import (
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"github.com/OerllydSaethwr/carrier/pkg/carrier/message"
 	"github.com/OerllydSaethwr/carrier/pkg/util"
@@ -10,23 +9,20 @@ import (
 	"go.dedis.ch/kyber/v4"
 	"go.dedis.ch/kyber/v4/pairing"
 	"go.dedis.ch/kyber/v4/sign/bdn"
-	"io/ioutil"
 	"math"
 	"net"
 	"sync"
+	"time"
 )
 
 type Carrier struct {
 	counter uint64
 
-	config Config
-
-	id string
+	config *util.Config
 
 	listeners Listeners
 	stores    Stores
 	locks     Locks
-	addresses Addresses
 
 	nodeConn *net.TCPConn
 	node     *Node
@@ -36,8 +32,7 @@ type Carrier struct {
 	// Registry of message handlers. Argument must be one of the enum types
 	messageHandlers map[message.Type]func(message.Message) error
 
-	suite   *pairing.SuiteBn256
-	keypair *util.KeyPairString
+	suite *pairing.SuiteBn256
 
 	f int
 	n int
@@ -49,34 +44,15 @@ type Carrier struct {
 	sbsCounter         int
 }
 
-func Load(file string) (*Carrier, error) {
-	// Read config file
-	rawdata, err := ioutil.ReadFile(file)
-	if err != nil {
-		return nil, err
-	}
-
-	config := &util.Config{}
-	err = json.Unmarshal(rawdata, config)
-	if err != nil {
-		return nil, err
-	}
-
-	// Create carrier.Neighbour structs and collect them into a map for fast access
+func NewCarrier(config *util.Config) *Carrier {
 	neighbours := map[string]*Neighbour{}
 	for _, n := range config.Neighbours {
 		neighbours[n.ID] = NewNeighbour(n.ID, n.Address, n.PK)
 	}
 
-	// Build a new carrier node
-	return NewCarrier(config.ID, config.Addresses.Client, config.Addresses.Carrier, config.Addresses.Front, config.Addresses.Decision, neighbours, &config.Keys), nil
-}
-
-func NewCarrier(id, clientToCarrierAddr, carrierToCarrierAddr, frontAddr, decisionAddr string, carriers map[string]*Neighbour, keypair *util.KeyPairString) *Carrier {
-
 	c := &Carrier{}
+	c.config = config
 	c.quit = make(chan bool, 1)
-	c.id = id
 
 	// TEMP
 	c.counter = 0
@@ -84,20 +60,12 @@ func NewCarrier(id, clientToCarrierAddr, carrierToCarrierAddr, frontAddr, decisi
 	c.sbsCounter = 0
 
 	c.suite = pairing.NewSuiteBn256()
-	c.keypair = keypair
 
-	c.node = NewNode(frontAddr)
-	c.neighbours = carriers
+	c.node = NewNode(config.Addresses.Front)
+	c.neighbours = neighbours
 
-	c.f = (len(carriers) - 1) / 3
-	c.n = len(carriers)
-
-	c.config = Config{
-		carrierConnRetryDelay: util.CarrierConnRetryDelay,
-		carrierConnMaxRetry:   util.CarrierConnMaxRetry,
-		nodeConnRetryDelay:    util.NodeConnRetryDelay,
-		nodeConnMaxRetry:      util.NodeConnMaxRetry,
-	}
+	c.f = (len(neighbours) - 1) / 3
+	c.n = len(neighbours)
 
 	c.messageHandlers = map[message.Type]func(message.Message) error{
 		message.Init:    c.handleInitMessage,
@@ -121,43 +89,37 @@ func NewCarrier(id, clientToCarrierAddr, carrierToCarrierAddr, frontAddr, decisi
 		acceptedHashStore: map[string][][]byte{},
 	}
 
-	c.addresses = Addresses{
-		client2carrier:  clientToCarrierAddr,
-		carrier2carrier: carrierToCarrierAddr,
-		decision:        decisionAddr,
-	}
+	//var err error
 
-	var err error
-
-	// Check client listener addr
-	_, err = util.ResolveTCPAddr(clientToCarrierAddr)
-	if err != nil {
-		log.Error().Msgf(err.Error())
-		return nil
-	}
-
-	// TODO move this
-	// Check carrier listener addr
-	_, err = util.ResolveTCPAddr(carrierToCarrierAddr)
-	if err != nil {
-		log.Error().Msgf(err.Error())
-		return nil
-	}
-
-	// Check front addr
-	_, err = util.ResolveTCPAddr(frontAddr)
-	if err != nil {
-		log.Error().Msgf(err.Error())
-		return nil
-	}
-
-	// Check other carrier addrs
-	for _, n := range c.neighbours {
-		_, err := util.ResolveTCPAddr(n.Address)
-		if err != nil {
-			log.Error().Msgf(err.Error())
-		}
-	}
+	//// Check client listener addr
+	//_, err = util.ResolveTCPAddr(clientToCarrierAddr)
+	//if err != nil {
+	//	log.Error().Msgf(err.Error())
+	//	return nil
+	//}
+	//
+	//// TODO move this
+	//// Check carrier listener addr
+	//_, err = util.ResolveTCPAddr(carrierToCarrierAddr)
+	//if err != nil {
+	//	log.Error().Msgf(err.Error())
+	//	return nil
+	//}
+	//
+	//// Check front addr
+	//_, err = util.ResolveTCPAddr(frontAddr)
+	//if err != nil {
+	//	log.Error().Msgf(err.Error())
+	//	return nil
+	//}
+	//
+	//// Check other carrier addrs
+	//for _, n := range c.neighbours {
+	//	_, err := util.ResolveTCPAddr(n.Address)
+	//	if err != nil {
+	//		log.Error().Msgf(err.Error())
+	//	}
+	//}
 
 	return c
 }
@@ -167,7 +129,7 @@ func NewCarrier(id, clientToCarrierAddr, carrierToCarrierAddr, frontAddr, decisi
 	We are not waiting for listeners to stop but I think it's fine
 */
 func (c *Carrier) Start() *sync.WaitGroup {
-	if util.ForwardMode {
+	if c.forwardMode() {
 		log.Info().Msgf("ForwardMode is turned on - logging of tsx is at debug level to avoid flooding. If you want to see individual logs, set log level to debug or higher.")
 	}
 
@@ -207,11 +169,11 @@ func (c *Carrier) Start() *sync.WaitGroup {
 	go c.handleIncomingConnections(c.listeners.carrierListener, c.handleCarrierConn)
 
 	//Connect to node
-	go connect(c.node, c.config.nodeConnRetryDelay, c.config.nodeConnMaxRetry)
+	go connect(c.node, time.Duration(c.config.Settings.NodeConnRetryDelay)*time.Millisecond, c.config.Settings.NodeConnMaxRetry)
 
 	// Set up connections to other neighbours
 	for _, n := range c.neighbours {
-		go connect(n, c.config.carrierConnRetryDelay, c.config.carrierConnMaxRetry)
+		go connect(n, time.Duration(c.config.Settings.CarrierConnRetryDelay)*time.Millisecond, c.config.Settings.CarrierConnMaxRetry)
 	}
 
 	//go c.logger()
@@ -246,15 +208,15 @@ func (c *Carrier) NestedPropose(P SuperBlockSummary) error {
 }
 
 func (c *Carrier) GetStringSK() string {
-	return c.keypair.Sk
+	return c.config.Keys.Sk
 }
 
 func (c *Carrier) GetStringPK() string {
-	return c.keypair.Pk
+	return c.config.Keys.Pk
 }
 
 func (c *Carrier) GetKyberSK() kyber.Scalar {
-	skk, err := util.DecodeStringToBdnSK(c.keypair.Sk)
+	skk, err := util.DecodeStringToBdnSK(c.config.Keys.Sk)
 	if err != nil {
 		panic("unable to decode SK")
 	}
@@ -263,7 +225,7 @@ func (c *Carrier) GetKyberSK() kyber.Scalar {
 }
 
 func (c *Carrier) GetKyberPK() kyber.Point {
-	pkk, err := util.DecodeStringToBdnPK(c.keypair.Pk)
+	pkk, err := util.DecodeStringToBdnPK(c.config.Keys.Pk)
 	if err != nil {
 		panic("unable to decode SK")
 	}
@@ -302,20 +264,6 @@ func (c *Carrier) Verify(h string, s util.Signature) error {
 	return err
 }
 
-//func (c *Carrier) VerifyPK(pk string) (kyber.Point, error) {
-//	//_, ok := c.neighbours[pk]
-//	//if !ok {
-//	//	return nil, fmt.Errorf("unrecognised sender")
-//	//}
-//
-//	pkk, err := util.DecodeStringToBdnPK(pk)
-//	if err != nil {
-//		return nil, err
-//	}
-//
-//	return pkk, nil
-//}
-
 func (c *Carrier) GetPKFromID(senderID string) (kyber.Point, error) {
 
 	n, ok := c.neighbours[senderID]
@@ -344,19 +292,19 @@ func (c *Carrier) decide(oldD map[string][][]byte) {
 }
 
 func (c *Carrier) getClientToCarrierAddress() string {
-	return c.addresses.client2carrier
+	return c.config.Addresses.Client
 }
 
 func (c *Carrier) getCarrierToCarrierAddress() string {
-	return c.addresses.carrier2carrier
+	return c.config.Addresses.Carrier
 }
 
 func (c *Carrier) getDecisionAddress() string {
-	return c.addresses.decision
+	return c.config.Addresses.Decision
 }
 
 func (c *Carrier) GetID() string {
-	return c.id
+	return c.config.ID
 }
 
 func (c *Carrier) startListener(address string) (*net.TCPListener, error) {
@@ -368,4 +316,16 @@ func (c *Carrier) startListener(address string) (*net.TCPListener, error) {
 	listener, err := util.ListenTCP(resolvedAddress)
 
 	return listener, err
+}
+
+func (c *Carrier) forwardMode() bool {
+	return c.config.Settings.ForwardMode == 1
+}
+
+func (c *Carrier) getTsxSize() int {
+	return c.config.Settings.TsxSize
+}
+
+func (c *Carrier) getMempoolThreshold() int {
+	return c.config.Settings.MempoolThreshold
 }

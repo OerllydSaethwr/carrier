@@ -18,15 +18,13 @@ func main() {
 	scriptPath := "scripts/"
 	configPath := filePath + "config/"
 
-	nodes := util.Nodes
-	hostsFile := ".hosts-local.json"
+	nodes := util.LocalNodes
+	paramsFile := ".hosts-local.json"
 	colon := ":"
-	port := util.BasePort
-	frontPort := util.FrontPort
+	frontPort := util.LocalFrontPort
 	host := "127.0.0.1"
 	portsPerCarrier := util.PortsPerCarrier
 
-	zerolog.SetGlobalLevel(util.LogLevel)
 	zerolog.TimeFieldFormat = util.LogTimeFormat
 
 	_, err := exec.Command("rm", "-rf", integrationPath+"log").Output()
@@ -42,14 +40,28 @@ func main() {
 	}
 	//log.Info().Msgf(string(output))
 
-	cmd := exec.Command("python3", scriptPath+"generate-local-hosts.py", strconv.Itoa(nodes), filePath+hostsFile)
+	cmd := exec.Command("python3", scriptPath+"generate-local-params.py", filePath+paramsFile)
 	_, err = cmd.Output()
 	if err != nil {
 		log.Error().Msgf(err.Error())
 		return
 	}
 
-	cmd = exec.Command("go", "run", "cmd/cobra/carrier.go", "generate", "config", filePath+hostsFile, configPath)
+	params, err := util.LoadParams(filePath + paramsFile)
+	if err != nil {
+		log.Error().Msgf(err.Error())
+		return
+	}
+
+	zerolog.SetGlobalLevel(zerolog.InfoLevel)
+	logLevel, err := zerolog.ParseLevel(params.Settings.LogLevel)
+	if err != nil {
+		log.Warn().Msgf(err.Error())
+	} else {
+		zerolog.SetGlobalLevel(logLevel)
+	}
+
+	cmd = exec.Command("go", "run", "cmd/cobra/carrier.go", "generate", "config", filePath+paramsFile, configPath)
 	_, err = cmd.Output()
 	if err != nil {
 		log.Error().Msgf(err.Error())
@@ -61,8 +73,8 @@ func main() {
 	decision := make([]string, 0)
 
 	for i := 0; i < nodes; i++ {
-		decision = append(decision, host+colon+strconv.Itoa(port+i*portsPerCarrier+1))
-		client = append(client, host+colon+strconv.Itoa(port+i*portsPerCarrier+2))
+		decision = append(decision, host+colon+strconv.Itoa(params.Settings.LocalBasePort+i*portsPerCarrier+1))
+		client = append(client, host+colon+strconv.Itoa(params.Settings.LocalBasePort+i*portsPerCarrier+2))
 		front = append(front, host+colon+strconv.Itoa(frontPort+i))
 	}
 
@@ -93,7 +105,7 @@ func main() {
 
 		// Launch client
 		if i == 0 {
-			cmd := exec.Command("go", "run", integrationPath+"client/client.go", client[i])
+			cmd := exec.Command("go", "run", integrationPath+"client/client.go", client[i], strconv.Itoa(params.Settings.TsxSize), strconv.Itoa(params.Settings.Rate))
 			cmd.Stdout = clientLog
 			cmd.Stderr = clientLog
 			err = cmd.Start()
@@ -138,11 +150,13 @@ func main() {
 	os.Stdout = logfile
 	os.Stderr = logfile
 
-	c, err := carrier.Load(configPath + ".carrier-0.json")
+	config, err := util.LoadConfig(configPath + ".carrier-0.json")
 	if err != nil {
 		log.Error().Msgf(err.Error())
 		return
 	}
+
+	c := carrier.NewCarrier(config)
 	wg := c.Start()
 
 	wg.Wait()

@@ -56,16 +56,27 @@ func validateCarrier(cmd *cobra.Command, args []string) error {
 
 func runCarrier(cmd *cobra.Command, args []string) error {
 
-	zerolog.SetGlobalLevel(util.LogLevel)
-	zerolog.TimeFieldFormat = util.LogTimeFormat
-
-	c, err := carrier.Load(args[0])
+	// LoadConfig configuration and settings
+	config, err := util.LoadConfig(args[0])
 	if err != nil {
 		return err
 	}
 
+	// Set logger level and format
+	logLevel, err := zerolog.ParseLevel(config.Settings.LogLevel)
+	if err != nil {
+		logLevel = zerolog.InfoLevel
+	}
+	zerolog.SetGlobalLevel(logLevel)
+	zerolog.TimeFieldFormat = util.LogTimeFormat
+
+	// LoadConfig carrier node from config
+	c := carrier.NewCarrier(config)
+
+	// Start carrier
 	wg := c.Start()
 
+	// Block until carrier is done
 	wg.Wait()
 
 	return nil

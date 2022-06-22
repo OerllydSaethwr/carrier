@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"github.com/OerllydSaethwr/carrier/pkg/util"
 	"github.com/spf13/cobra"
-	"io/ioutil"
 	"os"
 	"strconv"
 )
@@ -46,19 +45,12 @@ func validateGenerateConfig(cmd *cobra.Command, args []string) error {
 }
 
 func runGenerateConfig(cmd *cobra.Command, args []string) error {
-	hostsFile := args[0]
+	paramsFile := args[0]
 	outDir := args[1]
-	basePort := util.BasePort
 	colon := ":"
 	portsPerCarrier := util.PortsPerCarrier
 
-	rawdata, err := ioutil.ReadFile(hostsFile)
-	if err != nil {
-		return err
-	}
-
-	hosts := &util.Hosts{}
-	err = json.Unmarshal(rawdata, hosts)
+	params, err := util.LoadParams(paramsFile)
 	if err != nil {
 		return err
 	}
@@ -66,25 +58,25 @@ func runGenerateConfig(cmd *cobra.Command, args []string) error {
 	configs := make([]util.Config, 0)
 	neighbours := make([]util.Neighbour, 0)
 
-	// We will build n=len(hosts.Hosts) configs
-	for i, host := range hosts.Hosts {
+	// We will build n=len(params.Params) configs
+	for i, host := range params.Hosts {
 		config := util.Config{}
 		config.ID = strconv.Itoa(i)
 
 		config.Addresses = util.Addresses{}
-		config.Addresses.Front = hosts.Fronts[i]
+		config.Addresses.Front = params.Fronts[i]
 
 		// If we're on localhost we need to shift ports for each carrier so that they are all unique
 		shift := 0
 		if isLocalHost(host) {
 			shift = i * portsPerCarrier
-			config.Addresses.Decision = host + colon + strconv.Itoa(basePort+1+shift)
-			config.Addresses.Client = host + colon + strconv.Itoa(basePort+2+shift)
-			config.Addresses.Carrier = host + colon + strconv.Itoa(basePort+3+shift)
+			config.Addresses.Decision = host + colon + strconv.Itoa(params.Settings.LocalBasePort+1+shift)
+			config.Addresses.Client = host + colon + strconv.Itoa(params.Settings.LocalBasePort+2+shift)
+			config.Addresses.Carrier = host + colon + strconv.Itoa(params.Settings.LocalBasePort+3+shift)
 		} else {
-			config.Addresses.Decision = host + colon + strconv.Itoa(util.Decision)
-			config.Addresses.Carrier = host + colon + strconv.Itoa(util.Carrier)
-			config.Addresses.Client = host + colon + strconv.Itoa(util.Client)
+			config.Addresses.Decision = host + colon + strconv.Itoa(params.Settings.DecisionPort)
+			config.Addresses.Carrier = host + colon + strconv.Itoa(params.Settings.CarrierPort)
+			config.Addresses.Client = host + colon + strconv.Itoa(params.Settings.ClientPort)
 		}
 
 		kp, err := util.GenerateRandomKeypair()
@@ -116,6 +108,7 @@ func runGenerateConfig(cmd *cobra.Command, args []string) error {
 
 	for _, config := range configs {
 		config.Neighbours = neighbours
+		config.Settings = params.Settings
 
 		rawdata, err := json.Marshal(config)
 		if err != nil {
