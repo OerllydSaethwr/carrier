@@ -135,6 +135,8 @@ func (c *Carrier) Start() *sync.WaitGroup {
 		log.Info().Msgf("ForwardMode is turned on - logging of tsx is at debug level to avoid flooding. If you want to see individual logs, set log level to debug or higher.")
 	}
 
+	log.Info().Msgf("init-threshold: %d", c.getMempoolThreshold())
+
 	c.wg = &sync.WaitGroup{}
 	c.wg.Add(1)
 
