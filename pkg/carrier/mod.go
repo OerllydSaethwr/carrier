@@ -288,11 +288,9 @@ func (c *Carrier) GetSuite() pairing.Suite {
 func decide(D map[string][][]byte) {
 
 	// Process decided values
-	decidedHashes := make([]string, 0)
 	for h, _ := range D {
-		decidedHashes = append(decidedHashes, h)
+		log.Info().Msgf("committed %s", h)
 	}
-	log.Info().Msgf("decided %s", decidedHashes)
 }
 
 func (c *Carrier) getClientToCarrierAddress() string {

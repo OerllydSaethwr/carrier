@@ -60,6 +60,7 @@ outerLoop:
 
 		atomic.AddUint64(&c.counter, 1)
 
+		log.Info().Msgf("proposed %s", initMessage.Hash())
 		c.broadcast(initMessage)
 	}
 

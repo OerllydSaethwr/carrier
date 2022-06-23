@@ -22,7 +22,7 @@ type TransportMessage struct {
 type Message interface {
 	// Payload @Deprecated
 	Payload() []byte
-	// Hash @Deprecated
+	// Only use on InitMessage!
 	Hash() string
 	// Marshal @Deprecated
 	Marshal() *TransportMessage
