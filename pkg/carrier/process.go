@@ -1,6 +1,7 @@
 package carrier
 
 import (
+	"github.com/OerllydSaethwr/carrier/pkg/carrier/remote"
 	"github.com/OerllydSaethwr/carrier/pkg/util"
 	"github.com/rs/zerolog/log"
 	"net"
@@ -25,7 +26,7 @@ func (c *Carrier) handleIncomingConnections(l *net.TCPListener, handler func(con
 	}
 }
 
-func connect(n Remote, retryDelay time.Duration, maxRetry int) {
+func connect(n remote.Remote, retryDelay time.Duration, maxRetry int) {
 	// If xxxConnMaxRetry is 0, we keep retrying indefinitely
 	address, err := util.ResolveTCPAddr(n.GetAddress())
 	if err != nil {

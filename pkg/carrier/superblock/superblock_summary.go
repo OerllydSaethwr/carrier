@@ -1,8 +1,12 @@
-package carrier
+package superblock
 
-import "github.com/OerllydSaethwr/carrier/pkg/util"
+import (
+	"github.com/OerllydSaethwr/carrier/pkg/util"
+)
 
-func encodeSuperBlockSummary(P *SuperBlockSummary) []byte {
+type SuperBlockSummary map[string][]util.Signature
+
+func EncodeSuperBlockSummary(P *SuperBlockSummary) []byte {
 	buf := make([]byte, 0)
 
 	// 1. Length of map
@@ -46,7 +50,7 @@ func encodeSuperBlockSummary(P *SuperBlockSummary) []byte {
 }
 
 // Very inconsistent when compared with message.BinaryUnmarshal
-func decodeSuperBlockSummary(buf []byte) SuperBlockSummary {
+func DecodeSuperBlockSummary(buf []byte) SuperBlockSummary {
 	sbs := map[string][]util.Signature{}
 
 	// 1. Length of map

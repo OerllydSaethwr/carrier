@@ -1,21 +1,22 @@
-package carrier
+package codec
 
 import (
 	"fmt"
 	"github.com/OerllydSaethwr/carrier/pkg/carrier/message"
+	"github.com/OerllydSaethwr/carrier/pkg/carrier/superblock"
 	"github.com/OerllydSaethwr/carrier/pkg/util"
 	"net"
 	"sync"
 )
 
 type BinaryEncoder struct {
-	conn net.Conn
+	Conn net.Conn
 	lock *sync.RWMutex
 }
 
 func NewBinaryEncoder(conn net.Conn) *BinaryEncoder {
 	return &BinaryEncoder{
-		conn: conn,
+		Conn: conn,
 		lock: &sync.RWMutex{},
 	}
 }
@@ -28,8 +29,8 @@ func (be *BinaryEncoder) Encode(e any) error {
 	switch data := e.(type) {
 	case message.Message:
 		toSend = data.BinaryMarshal()
-	case *SuperBlockSummary:
-		toSend = encodeSuperBlockSummary(data)
+	case *superblock.SuperBlockSummary:
+		toSend = superblock.EncodeSuperBlockSummary(data)
 	case []byte:
 		toSend = data
 	default:
@@ -37,7 +38,7 @@ func (be *BinaryEncoder) Encode(e any) error {
 	}
 
 	be.lock.Lock()
-	_, err = be.conn.Write(util.Frame(toSend))
+	_, err = be.Conn.Write(util.Frame(toSend))
 	be.lock.Unlock()
 
 	return err

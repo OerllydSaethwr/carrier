@@ -1,8 +1,9 @@
-package carrier
+package codec
 
 import (
 	"fmt"
 	"github.com/OerllydSaethwr/carrier/pkg/carrier/message"
+	"github.com/OerllydSaethwr/carrier/pkg/carrier/superblock"
 	"github.com/OerllydSaethwr/carrier/pkg/util"
 	"io"
 	"net"
@@ -59,8 +60,8 @@ func (bd *BinaryDecoder) Decode(e any) error {
 		//TODO I'm not sure this pointer magic works
 		_, m := message.BinaryUnmarshal(buf2)
 		*data = m
-	case *SuperBlockSummary:
-		*data = decodeSuperBlockSummary(buf2)
+	case *superblock.SuperBlockSummary:
+		*data = superblock.DecodeSuperBlockSummary(buf2)
 	case *[]byte:
 		*data = buf2
 	default:

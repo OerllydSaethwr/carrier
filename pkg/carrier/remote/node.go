@@ -1,20 +1,21 @@
-package carrier
+package remote
 
 import (
+	"github.com/OerllydSaethwr/carrier/pkg/carrier/codec"
 	"github.com/rs/zerolog/log"
 	"net"
 )
 
 type Node struct {
 	address        string
-	encoder        *BinaryEncoder
+	encoder        *codec.BinaryEncoder
 	waitUntilAlive chan int
 }
 
 func NewNode(address string) *Node {
 	return &Node{
 		address:        address,
-		encoder:        NewBinaryEncoder(nil),
+		encoder:        codec.NewBinaryEncoder(nil),
 		waitUntilAlive: make(chan int),
 	}
 }
@@ -24,13 +25,13 @@ func (n *Node) GetAddress() string {
 }
 
 // GetEncoder will block until connection is alive
-func (n *Node) GetEncoder() Encoder {
+func (n *Node) GetEncoder() codec.Encoder {
 	n.WaitUntilAlive()
 	return n.encoder
 }
 
 func (n *Node) IsAlive() bool {
-	return n.encoder.conn != nil
+	return n.encoder.Conn != nil
 }
 
 func (n *Node) WaitUntilAlive() {
@@ -42,7 +43,7 @@ func (n *Node) WaitUntilAlive() {
 }
 
 func (n *Node) SetConnAndEncoderAndSignalAlive(conn *net.TCPConn) {
-	n.encoder = NewBinaryEncoder(conn)
+	n.encoder = codec.NewBinaryEncoder(conn)
 	close(n.waitUntilAlive)
 }
 

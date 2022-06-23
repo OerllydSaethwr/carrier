@@ -1,7 +1,9 @@
 package carrier
 
 import (
+	"github.com/OerllydSaethwr/carrier/pkg/carrier/codec"
 	"github.com/OerllydSaethwr/carrier/pkg/carrier/message"
+	"github.com/OerllydSaethwr/carrier/pkg/carrier/superblock"
 	"github.com/rs/zerolog/log"
 	"net"
 	"sync/atomic"
@@ -12,7 +14,7 @@ import (
 func (c *Carrier) handleClientConn(conn net.Conn) {
 	// Make a buffer to hold incoming data.
 	// Read the incoming connection into the buffer.
-	decoder := NewBinaryDecoder(conn)
+	decoder := codec.NewBinaryDecoder(conn)
 outerLoop:
 	for {
 
@@ -72,7 +74,7 @@ outerLoop:
 }
 
 func (c *Carrier) handleCarrierConn(conn net.Conn) {
-	decoder := NewBinaryDecoder(conn)
+	decoder := codec.NewBinaryDecoder(conn)
 	for {
 
 		// We expect packets framed using util.Frame - they will contain a uint32 (4 bytes) describing the length of the incoming stream
@@ -96,7 +98,7 @@ func (c *Carrier) handleCarrierConn(conn net.Conn) {
 }
 
 func (c *Carrier) decodeNestedSMRDecisions(conn net.Conn) {
-	decoder := NewBinaryDecoder(conn)
+	decoder := codec.NewBinaryDecoder(conn)
 	for {
 		// Only decode byte array if we're in forward mode
 		if c.forwardMode() {
@@ -109,7 +111,7 @@ func (c *Carrier) decodeNestedSMRDecisions(conn net.Conn) {
 			continue
 		}
 
-		var N SuperBlockSummary
+		var N superblock.SuperBlockSummary
 		err := decoder.Decode(&N)
 		if err != nil {
 			log.Error().Msgf(err.Error())

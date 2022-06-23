@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/OerllydSaethwr/carrier/pkg/carrier/message"
+	"github.com/OerllydSaethwr/carrier/pkg/carrier/superblock"
 	"github.com/OerllydSaethwr/carrier/pkg/util"
 )
 
@@ -87,7 +88,7 @@ func (c *Carrier) handleRequestMessage(rawMessage message.Message) error {
 			c.GetID(),
 		)
 		dest := c.neighbours[requestM.GetSenderID()]
-		dest.marshalAndSend(resolveM)
+		dest.MarshalAndSend(resolveM)
 	}
 
 	return nil
@@ -120,7 +121,7 @@ func (c *Carrier) handleResolveMessage(rawMessage message.Message) error {
 }
 
 // handleNestedSMRDecision assumes that N is safe and correct
-func (c *Carrier) handleNestedSMRDecision(N SuperBlockSummary) {
+func (c *Carrier) handleNestedSMRDecision(N superblock.SuperBlockSummary) {
 	// Adding a bottleneck here because of time constaints
 	// We should be able to process Nested SMR decisions concurrently
 	// This requires us to keep a separate instance of D for each decision we receive

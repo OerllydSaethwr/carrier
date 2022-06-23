@@ -1,0 +1,4 @@
+Create a wrapper around net.Conn that:
+    1. handles setting up the initial connection
+    2. reconnects to other carriers in case of a disconnection
+

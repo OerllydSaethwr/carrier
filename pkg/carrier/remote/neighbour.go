@@ -1,6 +1,8 @@
-package carrier
+package remote
 
 import (
+	"github.com/OerllydSaethwr/carrier/pkg/carrier/codec"
+	"github.com/OerllydSaethwr/carrier/pkg/carrier/message"
 	"github.com/OerllydSaethwr/carrier/pkg/util"
 	"github.com/rs/zerolog/log"
 	"net"
@@ -9,7 +11,7 @@ import (
 
 type Neighbour struct {
 	util.Neighbour
-	encoder        *BinaryEncoder
+	encoder        *codec.BinaryEncoder
 	waitUntilAlive chan int // Dummy channel that we use to block other processes until the connection becomes live
 	connLock       *sync.RWMutex
 }
@@ -21,7 +23,7 @@ func NewNeighbour(id, address, pk string) *Neighbour {
 			Address: address,
 			PK:      pk,
 		},
-		encoder:        NewBinaryEncoder(nil),
+		encoder:        codec.NewBinaryEncoder(nil),
 		waitUntilAlive: make(chan int),
 		connLock:       &sync.RWMutex{},
 	}
@@ -42,13 +44,13 @@ func (n *Neighbour) GetPK() string {
 }
 
 // GetEncoder will block until connection is alive
-func (n *Neighbour) GetEncoder() Encoder {
+func (n *Neighbour) GetEncoder() codec.Encoder {
 	n.WaitUntilAlive()
 	return n.encoder
 }
 
 func (n *Neighbour) IsAlive() bool {
-	return n.encoder.conn != nil
+	return n.encoder.Conn != nil
 }
 
 func (n *Neighbour) WaitUntilAlive() {
@@ -60,7 +62,7 @@ func (n *Neighbour) WaitUntilAlive() {
 }
 
 func (n *Neighbour) SetConnAndEncoderAndSignalAlive(conn *net.TCPConn) {
-	n.encoder = NewBinaryEncoder(conn)
+	n.encoder = codec.NewBinaryEncoder(conn)
 	close(n.waitUntilAlive)
 }
 
@@ -70,4 +72,17 @@ func (n *Neighbour) GetType() string {
 
 func (n *Neighbour) GetConnLock() *sync.RWMutex {
 	return n.connLock
+}
+
+func (n *Neighbour) Send(buf []byte) {
+
+	// Send to dest
+	err := n.GetEncoder().Encode(buf)
+	if err != nil {
+		log.Error().Msgf(err.Error())
+	}
+}
+
+func (n *Neighbour) MarshalAndSend(message message.Message) {
+	n.Send(message.BinaryMarshal())
 }

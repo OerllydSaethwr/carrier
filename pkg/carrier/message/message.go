@@ -46,6 +46,7 @@ func BinaryUnmarshal(buf []byte) (Type, Message) {
 	return t, msg
 }
 
+// Maybe these could be used when marshalling initMessages
 func BinaryMarshalSenderID(SenderID string) ([]byte, []byte) {
 	// 2. Put size of SenderID as 8 bytes - uint64
 	senderIDb := []byte(SenderID)

@@ -4,6 +4,8 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/OerllydSaethwr/carrier/pkg/carrier/message"
+	"github.com/OerllydSaethwr/carrier/pkg/carrier/remote"
+	"github.com/OerllydSaethwr/carrier/pkg/carrier/superblock"
 	"github.com/OerllydSaethwr/carrier/pkg/util"
 	"github.com/rs/zerolog/log"
 	"go.dedis.ch/kyber/v4"
@@ -25,9 +27,9 @@ type Carrier struct {
 	locks     Locks
 
 	nodeConn *net.TCPConn
-	node     *Node
+	node     *remote.Node
 
-	neighbours map[string]*Neighbour
+	neighbours map[string]*remote.Neighbour
 
 	// Registry of message handlers. Argument must be one of the enum types
 	messageHandlers map[message.Type]func(message.Message) error
@@ -44,10 +46,35 @@ type Carrier struct {
 	sbsCounter         int
 }
 
+type Locks struct {
+	ValueStore        *sync.RWMutex
+	SignatureStore    *sync.RWMutex
+	SuperBlockSummary *sync.RWMutex
+	AcceptedHashStore *sync.RWMutex
+
+	// This lock is a known bottleneck
+	DecisionLock *sync.RWMutex
+}
+
+type Stores struct {
+	valueStore        map[string][][]byte
+	signatureStore    map[string][]util.Signature
+	superBlockSummary map[string][]util.Signature
+	acceptedHashStore map[string][][]byte
+
+	decidedHashStore map[string]interface{}
+}
+
+type Listeners struct {
+	clientListener   *net.TCPListener
+	carrierListener  *net.TCPListener
+	decisionListener *net.TCPListener
+}
+
 func NewCarrier(config *util.Config) *Carrier {
-	neighbours := map[string]*Neighbour{}
+	neighbours := map[string]*remote.Neighbour{}
 	for _, n := range config.Neighbours {
-		neighbours[n.ID] = NewNeighbour(n.ID, n.Address, n.PK)
+		neighbours[n.ID] = remote.NewNeighbour(n.ID, n.Address, n.PK)
 	}
 
 	c := &Carrier{}
@@ -61,7 +88,7 @@ func NewCarrier(config *util.Config) *Carrier {
 
 	c.suite = pairing.NewSuiteBn256()
 
-	c.node = NewNode(config.Addresses.Front)
+	c.node = remote.NewNode(config.Addresses.Front)
 	c.neighbours = neighbours
 
 	c.f = (len(neighbours) - 1) / 3
@@ -200,7 +227,7 @@ func (c *Carrier) GetAddress() string {
 	return c.getCarrierToCarrierAddress()
 }
 
-func (c *Carrier) NestedPropose(P SuperBlockSummary) error {
+func (c *Carrier) NestedPropose(P superblock.SuperBlockSummary) error {
 
 	err := c.node.GetEncoder().Encode(&P)
 	if err != nil {

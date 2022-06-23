@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/OerllydSaethwr/carrier/pkg/carrier"
+	"github.com/OerllydSaethwr/carrier/pkg/carrier/codec"
 	"github.com/rs/zerolog/log"
 	"net"
 	"os"
@@ -41,10 +41,10 @@ func main() {
 
 // Handles incoming requests.
 func handleRequest(conn net.Conn, da string) {
-	decoder := carrier.NewBinaryDecoder(conn)
+	decoder := codec.NewBinaryDecoder(conn)
 
 	decision := setupDecisionConn(da)
-	encoder := carrier.NewBinaryEncoder(decision)
+	encoder := codec.NewBinaryEncoder(decision)
 	for {
 
 		var buf []byte
