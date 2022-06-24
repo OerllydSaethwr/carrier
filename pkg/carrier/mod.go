@@ -118,38 +118,6 @@ func NewCarrier(config *util.Config) *Carrier {
 		decidedHashStore: map[string]any{},
 	}
 
-	//var err error
-
-	//// Check client listener addr
-	//_, err = util.ResolveTCPAddr(clientToCarrierAddr)
-	//if err != nil {
-	//	log.Error().Msgf(err.Error())
-	//	return nil
-	//}
-	//
-	//// TODO move this
-	//// Check carrier listener addr
-	//_, err = util.ResolveTCPAddr(carrierToCarrierAddr)
-	//if err != nil {
-	//	log.Error().Msgf(err.Error())
-	//	return nil
-	//}
-	//
-	//// Check front addr
-	//_, err = util.ResolveTCPAddr(frontAddr)
-	//if err != nil {
-	//	log.Error().Msgf(err.Error())
-	//	return nil
-	//}
-	//
-	//// Check other carrier addrs
-	//for _, n := range c.neighbours {
-	//	_, err := util.ResolveTCPAddr(n.Address)
-	//	if err != nil {
-	//		log.Error().Msgf(err.Error())
-	//	}
-	//}
-
 	return c
 }
 
