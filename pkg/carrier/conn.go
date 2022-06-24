@@ -10,9 +10,9 @@ import (
 // Conn is a new wrapper around net.Conn
 // The idea is to implement a reliable connection that will detect errors and attempt to reconnect if the connection breaks down.
 type Conn struct {
-	conn    net.Conn
-	sink    chan []byte
-	address string
+	Conn    net.Conn
+	Sink    chan []byte
+	Address string
 }
 
 func Connect(address string, sinkBufferSize int) *Conn {
@@ -22,11 +22,11 @@ func Connect(address string, sinkBufferSize int) *Conn {
 }
 
 func (c *Conn) Write(buf []byte) {
-	c.sink <- buf
+	c.Sink <- buf
 }
 
-func (c *Conn) connect() error {
-	address, err := util.ResolveTCPAddr(c.address)
+func (c *Conn) Connect() error {
+	address, err := util.ResolveTCPAddr(c.Address)
 	if err != nil {
 		return err
 	}
@@ -35,19 +35,19 @@ func (c *Conn) connect() error {
 	if err != nil {
 		return err
 	} else {
-		c.conn = conn
+		c.Conn = conn
 		return nil
 	}
 }
 
-func (c *Conn) runSinkConsumer() {
+func (c *Conn) RunSinkConsumer() {
 	for {
-		if c.conn == nil {
-			c.connect()
+		if c.Conn == nil {
+			c.Connect()
 		} else {
-			_, err := c.conn.Write(<-c.sink)
+			_, err := c.Conn.Write(<-c.Sink)
 			if err != nil {
-				c.conn = nil
+				c.Conn = nil
 			}
 		}
 	}

@@ -11,13 +11,13 @@ import (
 
 type BinaryEncoder struct {
 	Conn net.Conn
-	lock *sync.RWMutex
+	Lock *sync.RWMutex
 }
 
 func NewBinaryEncoder(conn net.Conn) *BinaryEncoder {
 	return &BinaryEncoder{
 		Conn: conn,
-		lock: &sync.RWMutex{},
+		Lock: &sync.RWMutex{},
 	}
 }
 
@@ -37,9 +37,9 @@ func (be *BinaryEncoder) Encode(e any) error {
 		err = fmt.Errorf("encoding this type is not supported")
 	}
 
-	be.lock.Lock()
+	be.Lock.Lock()
 	_, err = be.Conn.Write(util.Frame(toSend))
-	be.lock.Unlock()
+	be.Lock.Unlock()
 
 	return err
 }

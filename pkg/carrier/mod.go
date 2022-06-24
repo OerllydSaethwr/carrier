@@ -18,32 +18,32 @@ import (
 )
 
 type Carrier struct {
-	counter uint64
+	Counter uint64
 
-	config *util.Config
+	Config *util.Config
 
-	listeners Listeners
-	stores    Stores
-	locks     Locks
+	Listeners Listeners
+	Stores    Stores
+	Locks     Locks
 
-	nodeConn *net.TCPConn
-	node     *remote.Node
+	NodeConn *net.TCPConn
+	Node     *remote.Node
 
-	neighbours map[string]*remote.Neighbour
+	Neighbours map[string]*remote.Neighbour
 
 	// Registry of message handlers. Argument must be one of the enum types
-	messageHandlers map[message.Type]func(message.Message) error
+	MessageHandlers map[message.Type]func(message.Message) error
 
-	suite *pairing.SuiteBn256
+	Suite *pairing.SuiteBn256
 
-	f int
-	n int
+	F int
+	N int
 
-	wg *sync.WaitGroup
+	Wg *sync.WaitGroup
 
-	quit               chan bool
-	broadcastDispenser chan message.Message
-	sbsCounter         int
+	Quit               chan bool
+	BroadcastDispenser chan message.Message
+	SbsCounter         int
 }
 
 type Locks struct {
@@ -78,30 +78,30 @@ func NewCarrier(config *util.Config) *Carrier {
 	}
 
 	c := &Carrier{}
-	c.config = config
-	c.quit = make(chan bool, 1)
+	c.Config = config
+	c.Quit = make(chan bool, 1)
 
 	// TEMP
-	c.counter = 0
-	c.broadcastDispenser = make(chan message.Message, int64(math.Pow10(7)))
-	c.sbsCounter = 0
+	c.Counter = 0
+	c.BroadcastDispenser = make(chan message.Message, int64(math.Pow10(7)))
+	c.SbsCounter = 0
 
-	c.suite = pairing.NewSuiteBn256()
+	c.Suite = pairing.NewSuiteBn256()
 
-	c.node = remote.NewNode(config.Addresses.Front)
-	c.neighbours = neighbours
+	c.Node = remote.NewNode(config.Addresses.Front)
+	c.Neighbours = neighbours
 
-	c.f = (len(neighbours) - 1) / 3
-	c.n = len(neighbours)
+	c.F = (len(neighbours) - 1) / 3
+	c.N = len(neighbours)
 
-	c.messageHandlers = map[message.Type]func(message.Message) error{
-		message.Init:    c.handleInitMessage,
-		message.Echo:    c.handleEchoMessage,
-		message.Request: c.handleRequestMessage,
-		message.Resolve: c.handleResolveMessage,
+	c.MessageHandlers = map[message.Type]func(message.Message) error{
+		message.Init:    c.HandleInitMessage,
+		message.Echo:    c.HandleEchoMessage,
+		message.Request: c.HandleRequestMessage,
+		message.Resolve: c.HandleResolveMessage,
 	}
 
-	c.locks = Locks{
+	c.Locks = Locks{
 		ValueStore:        &sync.RWMutex{},
 		SignatureStore:    &sync.RWMutex{},
 		SuperBlockSummary: &sync.RWMutex{},
@@ -109,7 +109,7 @@ func NewCarrier(config *util.Config) *Carrier {
 		DecisionLock:      &sync.RWMutex{},
 	}
 
-	c.stores = Stores{
+	c.Stores = Stores{
 		valueStore:        map[string][][]byte{},
 		signatureStore:    map[string][]util.Signature{},
 		superBlockSummary: map[string][]util.Signature{},
@@ -158,96 +158,96 @@ func NewCarrier(config *util.Config) *Carrier {
 	We are not waiting for listeners to stop but I think it's fine
 */
 func (c *Carrier) Start() *sync.WaitGroup {
-	if c.forwardMode() {
+	if c.ForwardMode() {
 		log.Info().Msgf("ForwardMode is turned on - logging of tsx is at debug level to avoid flooding. If you want to see individual logs, set log level to debug or higher.")
 	}
 
-	log.Info().Msgf("init-threshold: %d", c.getMempoolThreshold())
+	log.Info().Msgf("init-threshold: %d", c.GetMempoolThreshold())
 
-	c.wg = &sync.WaitGroup{}
-	c.wg.Add(1)
+	c.Wg = &sync.WaitGroup{}
+	c.Wg.Add(1)
 
 	var err error
 
 	// Listen to nested SMR decisions
-	c.listeners.decisionListener, err = c.startListener(c.getDecisionAddress())
+	c.Listeners.decisionListener, err = c.StartListener(c.GetDecisionAddress())
 	if err != nil {
 		log.Error().Msgf(err.Error())
-		c.wg.Done()
-		return c.wg
+		c.Wg.Done()
+		return c.Wg
 	}
-	log.Info().Msgf("start listening to nested SMR decisions on %s", c.getDecisionAddress())
-	go c.handleIncomingConnections(c.listeners.decisionListener, c.decodeNestedSMRDecisions)
+	log.Info().Msgf("start listening to nested SMR decisions on %s", c.GetDecisionAddress())
+	go c.HandleIncomingConnections(c.Listeners.decisionListener, c.DecodeNestedSMRDecisions)
 
 	// Listen to client
-	c.listeners.clientListener, err = c.startListener(c.getClientToCarrierAddress())
+	c.Listeners.clientListener, err = c.StartListener(c.GetClientToCarrierAddress())
 	if err != nil {
 		log.Error().Msgf(err.Error())
-		c.wg.Done()
-		return c.wg
+		c.Wg.Done()
+		return c.Wg
 	}
-	log.Info().Msgf("start listening to client on %s", c.getClientToCarrierAddress())
-	go c.handleIncomingConnections(c.listeners.clientListener, c.handleClientConn)
+	log.Info().Msgf("start listening to client on %s", c.GetClientToCarrierAddress())
+	go c.HandleIncomingConnections(c.Listeners.clientListener, c.HandleClientConn)
 
 	// Listen to carrier
-	c.listeners.carrierListener, err = c.startListener(c.getCarrierToCarrierAddress())
+	c.Listeners.carrierListener, err = c.StartListener(c.GetCarrierToCarrierAddress())
 	if err != nil {
 		log.Error().Msgf(err.Error())
-		c.wg.Done()
-		return c.wg
+		c.Wg.Done()
+		return c.Wg
 	}
-	log.Info().Msgf("start listening to neighbours on %s", c.getCarrierToCarrierAddress())
-	go c.handleIncomingConnections(c.listeners.carrierListener, c.handleCarrierConn)
+	log.Info().Msgf("start listening to neighbours on %s", c.GetCarrierToCarrierAddress())
+	go c.HandleIncomingConnections(c.Listeners.carrierListener, c.HandleCarrierConn)
 
 	//Connect to node
-	go connect(c.node, time.Duration(c.config.Settings.NodeConnRetryDelay)*time.Millisecond, c.config.Settings.NodeConnMaxRetry)
+	go connect(c.Node, time.Duration(c.Config.Settings.NodeConnRetryDelay)*time.Millisecond, c.Config.Settings.NodeConnMaxRetry)
 
 	// Set up connections to other neighbours
-	for _, n := range c.neighbours {
-		go connect(n, time.Duration(c.config.Settings.CarrierConnRetryDelay)*time.Millisecond, c.config.Settings.CarrierConnMaxRetry)
+	for _, n := range c.Neighbours {
+		go connect(n, time.Duration(c.Config.Settings.CarrierConnRetryDelay)*time.Millisecond, c.Config.Settings.CarrierConnMaxRetry)
 	}
 
 	//go c.logger()
-	c.launchWorkerPool(10, c.broadcastWorker)
+	c.LaunchWorkerPool(10, c.BroadcastWorker)
 
-	return c.wg
+	return c.Wg
 }
 
 func (c *Carrier) Stop() {
 	log.Trace().Msgf("stop Carrier")
-	err := c.listeners.clientListener.Close()
+	err := c.Listeners.clientListener.Close()
 	if err != nil {
 		log.Error().Msgf(err.Error())
 	}
-	c.quit <- true
-	c.wg.Done()
+	c.Quit <- true
+	c.Wg.Done()
 }
 
 func (c *Carrier) GetAddress() string {
-	return c.getCarrierToCarrierAddress()
+	return c.GetCarrierToCarrierAddress()
 }
 
 func (c *Carrier) NestedPropose(P superblock.SuperBlockSummary) error {
 
-	err := c.node.GetEncoder().Encode(&P)
+	err := c.Node.GetEncoder().Encode(&P)
 	if err != nil {
 		return err
 	}
 
-	log.Info().Msgf("proposed SuperBlock %d to %s", c.sbsCounter, c.node.GetAddress())
+	log.Info().Msgf("proposed SuperBlock %d to %s", c.SbsCounter, c.Node.GetAddress())
 	return nil
 }
 
 func (c *Carrier) GetStringSK() string {
-	return c.config.Keys.Sk
+	return c.Config.Keys.Sk
 }
 
 func (c *Carrier) GetStringPK() string {
-	return c.config.Keys.Pk
+	return c.Config.Keys.Pk
 }
 
 func (c *Carrier) GetKyberSK() kyber.Scalar {
-	skk, err := util.DecodeStringToBdnSK(c.config.Keys.Sk)
+	skk, err := util.DecodeStringToBdnSK(c.Config.Keys.Sk)
 	if err != nil {
 		panic("unable to decode SK")
 	}
@@ -256,7 +256,7 @@ func (c *Carrier) GetKyberSK() kyber.Scalar {
 }
 
 func (c *Carrier) GetKyberPK() kyber.Point {
-	pkk, err := util.DecodeStringToBdnPK(c.config.Keys.Pk)
+	pkk, err := util.DecodeStringToBdnPK(c.Config.Keys.Pk)
 	if err != nil {
 		panic("unable to decode SK")
 	}
@@ -269,7 +269,7 @@ func (c *Carrier) Sign(h string) string {
 	if err != nil {
 		panic("signing failed: failed to decode h")
 	}
-	s, err := bdn.Sign(c.suite, c.GetKyberSK(), hb)
+	s, err := bdn.Sign(c.Suite, c.GetKyberSK(), hb)
 	if err != nil {
 		panic("signing failed")
 	}
@@ -291,13 +291,13 @@ func (c *Carrier) Verify(h string, s util.Signature) error {
 	if err != nil {
 		return fmt.Errorf("failed to decode s: %s", err.Error())
 	}
-	err = bdn.Verify(c.suite, pk, hb, sb)
+	err = bdn.Verify(c.Suite, pk, hb, sb)
 	return err
 }
 
 func (c *Carrier) GetPKFromID(senderID string) (kyber.Point, error) {
 
-	n, ok := c.neighbours[senderID]
+	n, ok := c.Neighbours[senderID]
 	if !ok {
 		return nil, fmt.Errorf("pk not found in store")
 	}
@@ -311,10 +311,10 @@ func (c *Carrier) GetPKFromID(senderID string) (kyber.Point, error) {
 }
 
 func (c *Carrier) GetSuite() pairing.Suite {
-	return c.suite.Suite
+	return c.Suite.Suite
 }
 
-func decide(D map[string][][]byte) {
+func Decide(D map[string][][]byte) {
 
 	// Process decided values
 	for h, _ := range D {
@@ -322,23 +322,23 @@ func decide(D map[string][][]byte) {
 	}
 }
 
-func (c *Carrier) getClientToCarrierAddress() string {
-	return c.config.Addresses.Client
+func (c *Carrier) GetClientToCarrierAddress() string {
+	return c.Config.Addresses.Client
 }
 
-func (c *Carrier) getCarrierToCarrierAddress() string {
-	return c.config.Addresses.Carrier
+func (c *Carrier) GetCarrierToCarrierAddress() string {
+	return c.Config.Addresses.Carrier
 }
 
-func (c *Carrier) getDecisionAddress() string {
-	return c.config.Addresses.Decision
+func (c *Carrier) GetDecisionAddress() string {
+	return c.Config.Addresses.Decision
 }
 
 func (c *Carrier) GetID() string {
-	return c.config.ID
+	return c.Config.ID
 }
 
-func (c *Carrier) startListener(address string) (*net.TCPListener, error) {
+func (c *Carrier) StartListener(address string) (*net.TCPListener, error) {
 	resolvedAddress, err := util.ResolveTCPAddr(address)
 	resolvedAddress.IP = net.ParseIP("0.0.0.0") // We can only host on localhost
 	if err != nil {
@@ -349,14 +349,14 @@ func (c *Carrier) startListener(address string) (*net.TCPListener, error) {
 	return listener, err
 }
 
-func (c *Carrier) forwardMode() bool {
-	return c.config.Settings.ForwardMode == 1
+func (c *Carrier) ForwardMode() bool {
+	return c.Config.Settings.ForwardMode == 1
 }
 
-func (c *Carrier) getTsxSize() int {
-	return c.config.Settings.TsxSize
+func (c *Carrier) GetTsxSize() int {
+	return c.Config.Settings.TsxSize
 }
 
-func (c *Carrier) getMempoolThreshold() int {
-	return c.config.Settings.InitThreshold
+func (c *Carrier) GetMempoolThreshold() int {
+	return c.Config.Settings.InitThreshold
 }

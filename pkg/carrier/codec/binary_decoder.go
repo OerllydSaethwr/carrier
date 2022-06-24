@@ -11,15 +11,15 @@ import (
 )
 
 type BinaryDecoder struct {
-	conn net.Conn
-	lock *sync.RWMutex
+	Conn net.Conn
+	Lock *sync.RWMutex
 }
 
 // NewBinaryDecoder Usually we will be initiated with a conn that's alive, but just as a failsafe
 func NewBinaryDecoder(conn net.Conn) *BinaryDecoder {
 	return &BinaryDecoder{
-		conn: conn,
-		lock: &sync.RWMutex{},
+		Conn: conn,
+		Lock: &sync.RWMutex{},
 	}
 }
 
@@ -31,25 +31,25 @@ func (bd *BinaryDecoder) Decode(e any) error {
 	buf := make([]byte, 4)
 
 	// Synchronize access to the connection
-	bd.lock.Lock()
+	bd.Lock.Lock()
 
-	_, err = io.ReadFull(bd.conn, buf)
+	_, err = io.ReadFull(bd.Conn, buf)
 	if err != nil {
-		bd.lock.Unlock()
+		bd.Lock.Unlock()
 		return err
 	}
 	ls := util.UnmarshalUInt32(buf)
 
 	// Read ls number of bytes
 	buf2 := make([]byte, ls)
-	_, err = io.ReadFull(bd.conn, buf2)
+	_, err = io.ReadFull(bd.Conn, buf2)
 	if err != nil {
-		bd.lock.Unlock()
+		bd.Lock.Unlock()
 		return err
 	}
 
 	// Release lock as soon as we're done, instead of deferring. Decoding can be an expensive operation.
-	bd.lock.Unlock()
+	bd.Lock.Unlock()
 
 	switch data := e.(type) {
 

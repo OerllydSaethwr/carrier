@@ -10,10 +10,10 @@ import (
 
 /* Functions in this file are typically invoked as their own goroutines and loop either indefinitely or until their goal is achieved */
 
-func (c *Carrier) handleIncomingConnections(l *net.TCPListener, handler func(conn net.Conn)) {
+func (c *Carrier) HandleIncomingConnections(l *net.TCPListener, handler func(conn net.Conn)) {
 	for {
 		select {
-		case <-c.quit:
+		case <-c.Quit:
 			return
 		default:
 			conn, err := l.AcceptTCP()
@@ -46,12 +46,12 @@ func connect(n remote.Remote, retryDelay time.Duration, maxRetry int) {
 	}
 }
 
-func (c *Carrier) checkAcceptedHashStoreAndDecide() {
-	c.locks.AcceptedHashStore.Lock()
-	defer c.locks.AcceptedHashStore.Unlock()
+func (c *Carrier) CheckAcceptedHashStoreAndDecide() {
+	c.Locks.AcceptedHashStore.Lock()
+	defer c.Locks.AcceptedHashStore.Unlock()
 
 	decidedHashes := make([]string, 0)
-	for h, v := range c.stores.acceptedHashStore {
+	for h, v := range c.Stores.acceptedHashStore {
 
 		// If we don't have all hashes, abort
 		if v == nil {
@@ -61,33 +61,33 @@ func (c *Carrier) checkAcceptedHashStoreAndDecide() {
 	}
 
 	// Decide
-	defer c.locks.DecisionLock.Unlock()
-	D := c.stores.acceptedHashStore
-	c.stores.acceptedHashStore = map[string][][]byte{}
+	defer c.Locks.DecisionLock.Unlock()
+	D := c.Stores.acceptedHashStore
+	c.Stores.acceptedHashStore = map[string][][]byte{}
 	for _, hash := range decidedHashes {
-		c.stores.decidedHashStore[hash] = struct{}{}
+		c.Stores.decidedHashStore[hash] = struct{}{}
 	}
 
-	log.Info().Msgf("total hashes decided: %d", len(c.stores.decidedHashStore))
+	log.Info().Msgf("total hashes decided: %d", len(c.Stores.decidedHashStore))
 
-	decide(D)
+	Decide(D)
 }
 
-func (c *Carrier) logger() {
+func (c *Carrier) Logger() {
 	for {
 		time.Sleep(time.Second)
-		println(len(c.stores.valueStore))
+		println(len(c.Stores.valueStore))
 	}
 }
 
-func (c *Carrier) launchWorkerPool(poolSize int, task func()) {
+func (c *Carrier) LaunchWorkerPool(poolSize int, task func()) {
 	for i := 0; i < poolSize; i++ {
 		go task()
 	}
 }
 
-func (c *Carrier) broadcastWorker() {
+func (c *Carrier) BroadcastWorker() {
 	for {
-		c.executeBroadcast(<-c.broadcastDispenser)
+		c.ExecuteBroadcast(<-c.BroadcastDispenser)
 	}
 }

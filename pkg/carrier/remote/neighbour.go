@@ -11,9 +11,9 @@ import (
 
 type Neighbour struct {
 	util.Neighbour
-	encoder        *codec.BinaryEncoder
-	waitUntilAlive chan int // Dummy channel that we use to block other processes until the connection becomes live
-	connLock       *sync.RWMutex
+	Encoder            *codec.BinaryEncoder
+	WaitUntilAliveChan chan int // Dummy channel that we use to block other processes until the connection becomes live
+	ConnLock           *sync.RWMutex
 }
 
 func NewNeighbour(id, address, pk string) *Neighbour {
@@ -23,9 +23,9 @@ func NewNeighbour(id, address, pk string) *Neighbour {
 			Address: address,
 			PK:      pk,
 		},
-		encoder:        codec.NewBinaryEncoder(nil),
-		waitUntilAlive: make(chan int),
-		connLock:       &sync.RWMutex{},
+		Encoder:            codec.NewBinaryEncoder(nil),
+		WaitUntilAliveChan: make(chan int),
+		ConnLock:           &sync.RWMutex{},
 	}
 
 	return n
@@ -46,24 +46,24 @@ func (n *Neighbour) GetPK() string {
 // GetEncoder will block until connection is alive
 func (n *Neighbour) GetEncoder() codec.Encoder {
 	n.WaitUntilAlive()
-	return n.encoder
+	return n.Encoder
 }
 
 func (n *Neighbour) IsAlive() bool {
-	return n.encoder.Conn != nil
+	return n.Encoder.Conn != nil
 }
 
 func (n *Neighbour) WaitUntilAlive() {
 	if !n.IsAlive() {
 		log.Info().Msgf("waiting for connection with %s (carrier) to come alive...", n.GetAddress())
-		<-n.waitUntilAlive
+		<-n.WaitUntilAliveChan
 	}
 	return
 }
 
 func (n *Neighbour) SetConnAndEncoderAndSignalAlive(conn *net.TCPConn) {
-	n.encoder = codec.NewBinaryEncoder(conn)
-	close(n.waitUntilAlive)
+	n.Encoder = codec.NewBinaryEncoder(conn)
+	close(n.WaitUntilAliveChan)
 }
 
 func (n *Neighbour) GetType() string {
@@ -71,7 +71,7 @@ func (n *Neighbour) GetType() string {
 }
 
 func (n *Neighbour) GetConnLock() *sync.RWMutex {
-	return n.connLock
+	return n.ConnLock
 }
 
 func (n *Neighbour) Send(buf []byte) {

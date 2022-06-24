@@ -9,7 +9,7 @@ import (
 	"github.com/OerllydSaethwr/carrier/pkg/util"
 )
 
-func (c *Carrier) handleInitMessage(rawMessage message.Message) error {
+func (c *Carrier) HandleInitMessage(rawMessage message.Message) error {
 	initM, ok := rawMessage.(*message.InitMessage)
 	if !ok {
 		return fmt.Errorf("expected InitMessage")
@@ -27,16 +27,16 @@ func (c *Carrier) handleInitMessage(rawMessage message.Message) error {
 		s,
 	)
 
-	c.broadcast(echoM)
+	c.Broadcast(echoM)
 
-	c.locks.ValueStore.Lock()
-	c.stores.valueStore[h] = initM.V
-	c.locks.ValueStore.Unlock()
+	c.Locks.ValueStore.Lock()
+	c.Stores.valueStore[h] = initM.V
+	c.Locks.ValueStore.Unlock()
 
 	return nil
 }
 
-func (c *Carrier) handleEchoMessage(rawMessage message.Message) error {
+func (c *Carrier) HandleEchoMessage(rawMessage message.Message) error {
 	var err error
 	echoM, ok := rawMessage.(*message.EchoMessage)
 	if !ok {
@@ -45,27 +45,27 @@ func (c *Carrier) handleEchoMessage(rawMessage message.Message) error {
 
 	err = c.Verify(echoM.H, echoM.S)
 	if err == nil {
-		c.locks.SignatureStore.Lock()
-		c.stores.signatureStore[echoM.H] = append(c.stores.signatureStore[echoM.H], echoM.S)
+		c.Locks.SignatureStore.Lock()
+		c.Stores.signatureStore[echoM.H] = append(c.Stores.signatureStore[echoM.H], echoM.S)
 
 		// TODO potential deadlock, but I think it's fine for now
 		// @Critical C2
-		if len(c.stores.signatureStore[echoM.H]) == c.f+1 {
-			c.locks.SuperBlockSummary.Lock()
-			c.stores.superBlockSummary[echoM.H] = c.stores.signatureStore[echoM.H]
-			c.locks.SuperBlockSummary.Unlock()
+		if len(c.Stores.signatureStore[echoM.H]) == c.F+1 {
+			c.Locks.SuperBlockSummary.Lock()
+			c.Stores.superBlockSummary[echoM.H] = c.Stores.signatureStore[echoM.H]
+			c.Locks.SuperBlockSummary.Unlock()
 		}
 
-		c.locks.SignatureStore.Unlock()
+		c.Locks.SignatureStore.Unlock()
 	}
 
-	c.locks.SuperBlockSummary.Lock()
-	if len(c.stores.superBlockSummary) == c.n-c.f {
-		err = c.NestedPropose(c.stores.superBlockSummary)
-		c.stores.superBlockSummary = map[string][]util.Signature{}
-		c.sbsCounter++ // Advance superblockcounter
+	c.Locks.SuperBlockSummary.Lock()
+	if len(c.Stores.superBlockSummary) == c.N-c.F {
+		err = c.NestedPropose(c.Stores.superBlockSummary)
+		c.Stores.superBlockSummary = map[string][]util.Signature{}
+		c.SbsCounter++ // Advance superblockcounter
 	}
-	c.locks.SuperBlockSummary.Unlock()
+	c.Locks.SuperBlockSummary.Unlock()
 	if err != nil {
 		return err
 	}
@@ -73,28 +73,28 @@ func (c *Carrier) handleEchoMessage(rawMessage message.Message) error {
 	return nil
 }
 
-func (c *Carrier) handleRequestMessage(rawMessage message.Message) error {
+func (c *Carrier) HandleRequestMessage(rawMessage message.Message) error {
 	requestM, ok := rawMessage.(*message.RequestMessage)
 	if !ok {
 		return fmt.Errorf("expected RequestMessage")
 	}
 
-	c.locks.ValueStore.Lock()
-	defer c.locks.ValueStore.Unlock()
-	if v, ok := c.stores.valueStore[requestM.H]; ok {
+	c.Locks.ValueStore.Lock()
+	defer c.Locks.ValueStore.Unlock()
+	if v, ok := c.Stores.valueStore[requestM.H]; ok {
 		resolveM := message.NewResolveMessage(
 			requestM.H,
 			v,
 			c.GetID(),
 		)
-		dest := c.neighbours[requestM.GetSenderID()]
+		dest := c.Neighbours[requestM.GetSenderID()]
 		dest.MarshalAndSend(resolveM)
 	}
 
 	return nil
 }
 
-func (c *Carrier) handleResolveMessage(rawMessage message.Message) error {
+func (c *Carrier) HandleResolveMessage(rawMessage message.Message) error {
 	resolveM, ok := rawMessage.(*message.ResolveMessage)
 	if !ok {
 		return fmt.Errorf("expected ResolveMessage")
@@ -103,34 +103,34 @@ func (c *Carrier) handleResolveMessage(rawMessage message.Message) error {
 	hb := sha256.Sum256(resolveM.Payload())
 	h := hex.EncodeToString(hb[:])
 	if resolveM.H == h {
-		c.locks.ValueStore.Lock()
-		c.stores.valueStore[h] = resolveM.V
-		c.locks.ValueStore.Unlock()
+		c.Locks.ValueStore.Lock()
+		c.Stores.valueStore[h] = resolveM.V
+		c.Locks.ValueStore.Unlock()
 	}
 
-	c.locks.AcceptedHashStore.Lock()
-	if _, ok := c.stores.acceptedHashStore[h]; ok {
-		c.stores.acceptedHashStore[h] = resolveM.V
+	c.Locks.AcceptedHashStore.Lock()
+	if _, ok := c.Stores.acceptedHashStore[h]; ok {
+		c.Stores.acceptedHashStore[h] = resolveM.V
 
 	}
-	c.locks.AcceptedHashStore.Unlock()
+	c.Locks.AcceptedHashStore.Unlock()
 
-	c.checkAcceptedHashStoreAndDecide()
+	c.CheckAcceptedHashStoreAndDecide()
 
 	return nil
 }
 
-// handleNestedSMRDecision assumes that N is safe and correct
-func (c *Carrier) handleNestedSMRDecision(N superblock.SuperBlockSummary) {
+// HandleNestedSMRDecision assumes that N is safe and correct
+func (c *Carrier) HandleNestedSMRDecision(N superblock.SuperBlockSummary) {
 	// Adding a bottleneck here because of time constaints
 	// We should be able to process Nested SMR decisions concurrently
 	// This requires us to keep a separate instance of D for each decision we receive
 	// I didn't have time to implement this so I'm ensuring that we process each D sequentially
 
-	c.locks.DecisionLock.Lock()
+	c.Locks.DecisionLock.Lock()
 outer:
 	for h, S := range N {
-		if len(S) != c.f+1 {
+		if len(S) != c.F+1 {
 			continue outer
 		}
 		for _, s := range S {
@@ -142,25 +142,25 @@ outer:
 
 		// This is ugly, but we need the locking to prevent concurrency bugs
 		// Lock
-		c.locks.AcceptedHashStore.Lock()
-		c.locks.ValueStore.Lock()
-		if _, ok := c.stores.valueStore[h]; ok {
-			c.stores.acceptedHashStore[h] = c.stores.valueStore[h]
+		c.Locks.AcceptedHashStore.Lock()
+		c.Locks.ValueStore.Lock()
+		if _, ok := c.Stores.valueStore[h]; ok {
+			c.Stores.acceptedHashStore[h] = c.Stores.valueStore[h]
 
 			// Unlock
-			c.locks.ValueStore.Unlock()
-			c.locks.AcceptedHashStore.Unlock()
+			c.Locks.ValueStore.Unlock()
+			c.Locks.AcceptedHashStore.Unlock()
 
 		} else {
-			c.stores.acceptedHashStore[h] = nil
+			c.Stores.acceptedHashStore[h] = nil
 
 			// Unlock
-			c.locks.ValueStore.Unlock()
-			c.locks.AcceptedHashStore.Unlock()
+			c.Locks.ValueStore.Unlock()
+			c.Locks.AcceptedHashStore.Unlock()
 
-			c.broadcast(message.NewRequestMessage(h, c.GetID()))
+			c.Broadcast(message.NewRequestMessage(h, c.GetID()))
 		}
 	}
 
-	c.checkAcceptedHashStoreAndDecide()
+	c.CheckAcceptedHashStoreAndDecide()
 }
